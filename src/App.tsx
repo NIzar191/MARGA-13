@@ -158,38 +158,38 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F9F9FB] text-slate-900 font-sans selection:bg-indigo-100">
+    <div className="min-h-screen bg-zinc-950 text-zinc-50 font-sans selection:bg-red-900/30">
       {/* Mobile Top Header */}
-      <div className="md:hidden sticky top-0 z-40 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+      <div className="md:hidden sticky top-0 z-40 bg-zinc-900/80 backdrop-blur-lg border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white">
+          <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-red-600/20">
             <Users size={16} />
           </div>
-          <span className="font-bold text-slate-800 tracking-tight">MARGA 13</span>
+          <span className="font-bold text-zinc-100 tracking-tight">MARGA 13</span>
         </div>
         <button 
           onClick={() => setIsMobileMenuOpen(true)}
-          className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+          className="p-2 text-zinc-400 hover:bg-zinc-800 rounded-lg transition-colors"
         >
           <Menu size={24} />
         </button>
       </div>
 
       {/* Sidebar - Desktop */}
-      <div className="fixed left-0 top-0 h-full w-64 bg-white border-r border-slate-200 p-6 hidden md:block">
+      <div className="fixed left-0 top-0 h-full w-64 bg-zinc-900 border-r border-zinc-800 p-6 hidden md:block">
         <div className="flex items-center gap-3 mb-10 px-2">
-          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white">
+          <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center text-white shadow-xl shadow-red-600/30">
             <Users size={20} />
           </div>
-          <span className="font-bold text-xl tracking-tight text-indigo-900">Marga Manager</span>
+          <span className="font-black text-xl tracking-tighter text-zinc-100 italic">MARGA 13</span>
         </div>
 
         <nav className="space-y-1">
           <div className="flex items-center justify-between px-2 mb-4">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Circles Anda</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Daftar Circle</span>
             <button 
               onClick={createNewCircle}
-              className="p-1 hover:bg-slate-100 rounded-md text-slate-500 transition-colors"
+              className="p-1.5 hover:bg-zinc-800 rounded-md text-zinc-400 hover:text-red-500 transition-colors"
               title="Tambah Circle"
               id="add-circle-sidebar"
             >
@@ -200,15 +200,15 @@ export default function App() {
             <button
               key={c.id}
               onClick={() => setActiveCircleId(c.id)}
-              className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center justify-between transition-all group ${
+              className={`w-full text-left px-3 py-3 rounded-xl flex items-center justify-between transition-all group ${
                 activeCircleId === c.id 
-                ? 'bg-indigo-50 text-indigo-700 shadow-sm' 
-                : 'text-slate-600 hover:bg-slate-50 active:scale-[0.98]'
+                ? 'bg-red-600/10 text-red-500 shadow-sm border border-red-600/20' 
+                : 'text-zinc-400 hover:bg-zinc-800 active:scale-[0.98]'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Circle size={14} className={activeCircleId === c.id ? 'fill-indigo-600' : 'text-slate-300'} />
-                <span className="font-medium truncate max-w-[140px]">{c.name}</span>
+                <Circle size={14} className={activeCircleId === c.id ? 'fill-red-500' : 'text-zinc-700'} />
+                <span className={`font-bold truncate max-w-[140px] ${activeCircleId === c.id ? 'text-red-500' : ''}`}>{c.name}</span>
               </div>
               <ChevronRight size={16} className={`transition-transform ${activeCircleId === c.id ? 'translate-x-0' : '-translate-x-2 opacity-0 group-hover:opacity-100'}`} />
             </button>
@@ -225,31 +225,31 @@ export default function App() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsMobileMenuOpen(false)}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
             />
             <motion.div 
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="absolute left-0 top-0 h-full w-4/5 bg-white shadow-2xl p-6"
+              className="absolute left-0 top-0 h-full w-4/5 bg-zinc-900 border-r border-zinc-800 shadow-2xl p-6"
             >
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white">
+                  <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center text-white">
                     <Users size={20} />
                   </div>
-                  <span className="font-bold text-xl tracking-tight text-indigo-900">Marga</span>
+                  <span className="font-bold text-xl tracking-tight text-white">Circle</span>
                 </div>
-                <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-slate-400">
+                <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-zinc-500">
                   <X size={24} />
                 </button>
               </div>
 
               <nav className="space-y-1">
                 <div className="flex items-center justify-between px-2 mb-4">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Circles Anda</span>
-                  <button onClick={createNewCircle} className="p-1 bg-slate-100 rounded-md">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Circles Anda</span>
+                  <button onClick={createNewCircle} className="p-1 bg-zinc-800 rounded-md text-zinc-400">
                     <Plus size={16} />
                   </button>
                 </div>
@@ -257,11 +257,11 @@ export default function App() {
                   <button
                     key={c.id}
                     onClick={() => { setActiveCircleId(c.id); setIsMobileMenuOpen(false); }}
-                    className={`w-full text-left px-4 py-3 rounded-xl flex items-center gap-4 ${
-                      activeCircleId === c.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600'
+                    className={`w-full text-left px-4 py-4 rounded-xl flex items-center gap-4 ${
+                      activeCircleId === c.id ? 'bg-red-600/20 text-red-500 border border-red-600/30' : 'text-zinc-400 hover:bg-zinc-800'
                     }`}
                   >
-                    <Circle size={14} className={activeCircleId === c.id ? 'fill-indigo-600' : 'text-slate-300'} />
+                    <Circle size={14} className={activeCircleId === c.id ? 'fill-red-500' : 'text-zinc-700'} />
                     <span className="font-bold">{c.name}</span>
                   </button>
                 ))}
@@ -272,10 +272,10 @@ export default function App() {
       </AnimatePresence>
 
       {/* Main Content */}
-      <main className="md:ml-64 p-4 md:p-10 max-w-5xl mx-auto min-h-screen">
+      <main className="md:ml-64 p-4 md:p-12 max-w-6xl mx-auto min-h-screen">
         {/* Header */}
-        <header className="mb-8 space-y-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <header className="mb-12 space-y-8">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
             <div className="group">
               {isEditingCircleName ? (
                 <div className="flex items-center gap-2">
@@ -285,110 +285,109 @@ export default function App() {
                     onChange={(e) => setEditingNameValue(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && updateCircleName()}
                     onBlur={() => updateCircleName()}
-                    className="text-3xl md:text-4xl font-black tracking-tight text-slate-900 bg-transparent border-b-4 border-indigo-600 outline-none focus:ring-0 px-0 py-1"
+                    className="text-4xl md:text-6xl font-black tracking-tighter text-white bg-transparent border-b-8 border-red-600 outline-none focus:ring-0 px-0 py-2 italic uppercase"
                   />
                 </div>
               ) : (
-                <div className="flex items-center gap-3">
-                  <h1 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 leading-tight">
+                <div className="flex items-center gap-4">
+                  <h1 className="text-4xl md:text-7xl font-black tracking-tighter text-white leading-none uppercase italic">
                     {activeCircle.name}
                   </h1>
                   <button 
                     onClick={() => { setIsEditingCircleName(true); setEditingNameValue(activeCircle.name); }}
-                    className="p-2 text-slate-300 hover:text-indigo-600 transition-colors md:opacity-0 md:group-hover:opacity-100"
+                    className="p-2 text-zinc-700 hover:text-red-500 transition-colors md:opacity-0 md:group-hover:opacity-100"
                     id="edit-btn-header"
                   >
                     <Edit2 size={24} />
                   </button>
                 </div>
               )}
-              <div className="flex items-center gap-4 mt-2">
-                <p className="text-slate-500 font-medium flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-slate-100 shadow-sm text-sm">
-                  <Users size={14} className="text-indigo-500" />
+              <div className="flex flex-wrap items-center gap-4 mt-6">
+                <p className="text-zinc-200 font-black flex items-center gap-3 bg-zinc-900 px-5 py-2.5 rounded-full border border-zinc-800 shadow-xl text-sm uppercase tracking-widest">
+                  <Users size={16} className="text-red-500" />
                   {activeCircle.members.length} Peserta
                 </p>
-                <div className="h-4 w-px bg-slate-200 hidden sm:block" />
-                <p className="text-slate-400 text-xs hidden sm:block font-mono">
-                  Dibuat {new Date(activeCircle.createdAt).toLocaleDateString()}
+                <p className="text-zinc-500 text-xs font-mono uppercase bg-zinc-900/50 px-4 py-2 rounded-full border border-zinc-800/50">
+                  EST. {new Date(activeCircle.createdAt).getFullYear()}
                 </p>
               </div>
             </div>
 
             <button 
               onClick={() => setIsAddingMember(true)}
-              className="inline-flex items-center justify-center gap-3 bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-5 rounded-3xl font-black shadow-2xl shadow-indigo-200 transition-all active:scale-95 text-xl relative overflow-hidden group/btn"
+              className="inline-flex items-center justify-center gap-4 bg-red-600 hover:bg-red-700 text-white px-10 py-6 rounded-2xl font-black shadow-2xl shadow-red-600/20 transition-all active:scale-95 text-xl relative overflow-hidden group/btn uppercase tracking-tighter italic"
               id="add-member-top"
             >
               <div className="absolute inset-0 bg-white opacity-0 group-hover/btn:opacity-10 transition-opacity" />
-              <UserPlus size={26} />
+              <UserPlus size={28} />
               Tambah Teman
             </button>
           </div>
 
           {/* Search Bar */}
           <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none text-slate-300 group-focus-within:text-indigo-600 transition-colors">
-              <Search size={24} />
+            <div className="absolute inset-y-0 left-0 pl-8 flex items-center pointer-events-none text-zinc-600 group-focus-within:text-red-500 transition-colors">
+              <Search size={28} />
             </div>
             <input
               type="text"
-              placeholder={`Cari peserta di ${activeCircle.name}...`}
+              placeholder={`CARI NAMA DI ${activeCircle.name}...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white border-2 border-slate-100 rounded-[2rem] py-6 pl-16 pr-8 shadow-sm focus:ring-8 focus:ring-indigo-50 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-200 text-xl font-medium"
+              className="w-full bg-zinc-900/50 border-2 border-zinc-800/50 rounded-3xl py-7 pl-20 pr-10 shadow-2xl focus:ring-8 focus:ring-red-600/5 focus:border-red-600/40 outline-none transition-all placeholder:text-zinc-800 text-2xl font-black text-white italic uppercase tracking-tighter"
             />
           </div>
         </header>
 
         {/* Member Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           <AnimatePresence mode="popLayout">
             {filteredMembers.map((member) => (
               <motion.div
                 layout
                 key={member.id}
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                initial={{ opacity: 0, scale: 0.9, y: 30 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: -20 }}
-                transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-                className="bg-white p-7 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:shadow-indigo-600/5 hover:-translate-y-1 hover:border-indigo-100 transition-all group relative overflow-hidden"
+                exit={{ opacity: 0, scale: 0.8, y: -30 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 400 }}
+                className="bg-zinc-900/40 p-8 rounded-[2rem] border border-zinc-800/50 shadow-sm hover:shadow-2xl hover:shadow-red-600/10 hover:-translate-y-2 hover:border-red-600/30 transition-all group relative overflow-hidden backdrop-blur-sm"
               >
-                <div className="flex items-center gap-5 relative z-10">
-                  <div className="w-16 h-16 rounded-[1.5rem] bg-indigo-600 flex items-center justify-center text-white font-black text-2xl shadow-lg shadow-indigo-200 group-hover:rotate-6 transition-transform">
+                <div className="flex items-center gap-6 relative z-10">
+                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-white font-black text-3xl shadow-2xl shadow-red-950 group-hover:rotate-12 transition-transform">
                     {member.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-black text-slate-800 text-xl truncate group-hover:text-indigo-600 transition-colors">{member.name}</h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">
-                        Active Member
+                    <h3 className="font-black text-zinc-100 text-2xl truncate group-hover:text-red-500 transition-colors leading-tight italic uppercase">{member.name}</h3>
+                    <div className="flex items-center gap-3 mt-2">
+                      <div className="w-2 h-2 rounded-full bg-red-600 shadow-[0_0_10px_rgba(220,38,38,0.8)]" />
+                      <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.3em]">
+                        Verified Member
                       </p>
                     </div>
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     <button 
                       onClick={() => {
                         setMemberToEdit(member);
                         setEditMemberNameValue(member.name);
                       }}
-                      className="p-2 text-slate-100 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all md:opacity-0 md:group-hover:opacity-100"
+                      className="p-3 text-zinc-600 hover:text-red-500 hover:bg-red-600/10 rounded-xl transition-all md:opacity-0 md:group-hover:opacity-100"
                       title="Edit"
                     >
-                      <Edit2 size={18} />
+                      <Edit2 size={20} />
                     </button>
                     <button 
                       onClick={() => removeMember(member.id)}
-                      className="p-2 text-slate-100 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all md:opacity-0 md:group-hover:opacity-100"
+                      className="p-3 text-zinc-600 hover:text-red-600 hover:bg-red-600/10 rounded-xl transition-all md:opacity-0 md:group-hover:opacity-100"
                       title="Hapus"
                     >
-                      <Trash2 size={18} />
+                      <Trash2 size={20} />
                     </button>
                   </div>
                 </div>
                 
                 {/* Visual Flair */}
-                <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-slate-50 rounded-full blur-3xl group-hover:bg-indigo-50 transition-colors duration-500" />
+                <div className="absolute -bottom-12 -right-12 w-40 h-40 bg-red-600/2 rounded-full blur-3xl group-hover:bg-red-600/5 transition-colors duration-700" />
               </motion.div>
             ))}
           </AnimatePresence>
@@ -397,21 +396,22 @@ export default function App() {
             <motion.div 
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }}
-              className="col-span-full flex flex-col items-center justify-center py-32 text-center rounded-[3rem] border-4 border-dashed border-slate-100 bg-white/50"
+              className="col-span-full flex flex-col items-center justify-center py-40 text-center rounded-[3rem] border-4 border-dashed border-zinc-800 bg-zinc-900/20"
             >
-              <div className="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-200 mb-8 animate-bounce">
-                <Users size={48} />
+              <div className="w-32 h-32 bg-zinc-800/50 rounded-full flex items-center justify-center text-zinc-700 mb-10 group relative">
+                <Users size={64} className="group-hover:text-red-600 transition-colors" />
+                <div className="absolute inset-0 bg-red-600/5 rounded-full blur-2xl animate-pulse" />
               </div>
-              <h3 className="text-2xl font-black text-slate-800 tracking-tight">Tidak Ada Hasil</h3>
-              <p className="text-slate-500 max-w-xs mx-auto mt-3 text-lg leading-relaxed">
-                Waduh! Nama yang kamu cari nggak ada di <b>{activeCircle.name}</b> nih.
+              <h3 className="text-3xl font-black text-zinc-300 tracking-tighter uppercase italic">Tidak Menemukan Nama</h3>
+              <p className="text-zinc-500 max-w-sm mx-auto mt-4 text-xl font-medium leading-relaxed">
+                Waduh, nggak ada yang namanya "{searchQuery}" di sini.
               </p>
               <button 
                 onClick={() => setSearchQuery('')}
-                className="mt-8 text-indigo-600 font-black text-lg hover:bg-indigo-50 px-6 py-2 rounded-full transition-colors"
+                className="mt-10 bg-zinc-800 hover:bg-red-600 text-zinc-100 font-black text-lg px-8 py-3 rounded-full transition-all active:scale-95 uppercase tracking-widest"
                 id="reset-search"
               >
-                Reset Pencarian
+                Reset Cari
               </button>
             </motion.div>
           )}
@@ -419,17 +419,22 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="md:ml-64 p-10 text-center">
-        <div className="max-w-xs mx-auto space-y-4">
-          <div className="flex justify-center gap-1">
-            {[1, 2, 3].map(i => <div key={i} className="w-8 h-1 bg-slate-100 rounded-full" />)}
+      <footer className="md:ml-64 p-16 text-center border-t border-zinc-900 bg-black/20">
+        <div className="max-w-md mx-auto space-y-6">
+          <div className="flex justify-center gap-3">
+            {[1, 2, 3].map(i => <div key={i} className="w-12 h-1 bg-zinc-800 rounded-full group-hover:bg-red-600 transition-colors" />)}
           </div>
-          <p className="text-slate-400 font-bold text-sm tracking-widest uppercase">
-            &copy; {new Date().getFullYear()} MARGA 13
+          <p className="text-zinc-500 font-black text-base tracking-[0.5em] uppercase italic">
+            MARGA <span className="text-red-600">13</span>
           </p>
-          <p className="text-[10px] text-slate-300 font-mono">
-            Data persists in your local storage
-          </p>
+          <div className="pt-4 space-y-2">
+            <p className="text-[10px] text-zinc-700 font-mono uppercase tracking-widest">
+              Secured & local persistence active
+            </p>
+            <p className="text-[9px] text-zinc-800 uppercase tracking-widest">
+              v1.5.0-alpha elite
+            </p>
+          </div>
         </div>
       </footer>
 
@@ -442,51 +447,51 @@ export default function App() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsAddingMember(false)}
-              className="absolute inset-0 bg-slate-900/40 backdrop-blur-xl"
+              className="absolute inset-0 bg-black/90 backdrop-blur-2xl"
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 100 }}
+              initial={{ opacity: 0, scale: 0.8, y: 100 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 100 }}
-              transition={{ type: 'spring', damping: 20 }}
-              className="relative w-full max-w-md bg-white rounded-[3rem] shadow-2xl p-10 overflow-hidden"
+              exit={{ opacity: 0, scale: 0.8, y: 100 }}
+              transition={{ type: 'spring', damping: 25 }}
+              className="relative w-full max-w-lg bg-zinc-900 rounded-[3rem] shadow-[0_0_100px_rgba(220,38,38,0.1)] p-12 overflow-hidden border border-zinc-800"
             >
-              <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-indigo-600 to-violet-600" />
+              <div className="absolute top-0 left-0 w-full h-4 bg-gradient-to-r from-red-600 via-red-500 to-red-800" />
               
-              <div className="flex justify-between items-start mb-10">
+              <div className="flex justify-between items-start mb-14 text-white">
                 <div>
-                  <h2 className="text-3xl font-black text-slate-900 leading-none">Tambah</h2>
-                  <h2 className="text-3xl font-black text-indigo-600 mt-1 leading-none">Peserta</h2>
-                  <div className="h-1 w-12 bg-slate-100 mt-4 rounded-full" />
+                  <h2 className="text-5xl font-black leading-none italic uppercase tracking-tighter">Tambah</h2>
+                  <h2 className="text-5xl font-black text-red-600 mt-2 leading-none italic uppercase tracking-tighter">Peserta</h2>
+                  <div className="h-2 w-20 bg-red-600/30 mt-6 rounded-full" />
                 </div>
                 <button 
                   onClick={() => setIsAddingMember(false)} 
-                  className="p-3 hover:bg-slate-50 rounded-2xl transition-colors text-slate-300 hover:text-slate-600"
+                  className="p-4 hover:bg-zinc-800 rounded-3xl transition-colors text-zinc-600 hover:text-red-500"
                 >
-                  <X size={32} />
+                  <X size={36} />
                 </button>
               </div>
               
-              <div className="space-y-8">
-                <div className="space-y-3">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-2">Nama Lengkap Teman</label>
+              <div className="space-y-10">
+                <div className="space-y-4">
+                  <label className="block text-[11px] font-black text-zinc-400 uppercase tracking-[0.4em] ml-4">Informasi Nama Teman</label>
                   <input
                     autoFocus
                     type="text"
                     value={newMemberName}
                     onChange={(e) => setNewMemberName(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && addMember()}
-                    placeholder="Contoh: Andi Wijaya"
-                    className="w-full bg-slate-50 border-4 border-slate-50 rounded-[1.5rem] py-5 px-6 focus:bg-white focus:border-indigo-100 outline-none transition-all text-xl font-bold text-slate-800 placeholder:text-slate-200"
+                    placeholder="E.G. ANDREAS BLACK"
+                    className="w-full bg-zinc-950 border-4 border-zinc-950 rounded-[1.5rem] py-7 px-8 focus:bg-black focus:border-red-600/30 outline-none transition-all text-2xl font-black text-white italic uppercase placeholder:text-zinc-800"
                   />
                 </div>
                 
                 <button 
                   onClick={addMember}
                   disabled={!newMemberName.trim()}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-6 rounded-[1.5rem] font-black shadow-2xl shadow-indigo-200 disabled:opacity-20 disabled:shadow-none transition-all active:scale-95 text-xl tracking-tight"
+                  className="w-full bg-red-600 hover:bg-red-700 text-white py-8 rounded-[1.5rem] font-black shadow-2xl shadow-red-950 disabled:opacity-20 disabled:shadow-none transition-all active:scale-95 text-2xl tracking-tighter italic uppercase"
                 >
-                  Simpan Sekarang
+                  Simpan Peserta Baru
                 </button>
               </div>
             </motion.div>
@@ -503,51 +508,51 @@ export default function App() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => { setMemberToEdit(null); setEditMemberNameValue(''); }}
-              className="absolute inset-0 bg-slate-900/40 backdrop-blur-xl"
+              className="absolute inset-0 bg-black/90 backdrop-blur-2xl"
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 100 }}
+              initial={{ opacity: 0, scale: 0.8, y: 100 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 100 }}
-              transition={{ type: 'spring', damping: 20 }}
-              className="relative w-full max-w-md bg-white rounded-[3rem] shadow-2xl p-10 overflow-hidden"
+              exit={{ opacity: 0, scale: 0.8, y: 100 }}
+              transition={{ type: 'spring', damping: 25 }}
+              className="relative w-full max-w-lg bg-zinc-900 rounded-[3rem] shadow-[0_0_100px_rgba(220,38,38,0.1)] p-12 overflow-hidden border border-zinc-800"
             >
-              <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-teal-500 to-indigo-600" />
+              <div className="absolute top-0 left-0 w-full h-4 bg-gradient-to-r from-red-600 to-zinc-900" />
               
-              <div className="flex justify-between items-start mb-10">
+              <div className="flex justify-between items-start mb-14 text-white">
                 <div>
-                  <h2 className="text-3xl font-black text-slate-900 leading-none">Edit</h2>
-                  <h2 className="text-3xl font-black text-teal-600 mt-1 leading-none">Peserta</h2>
-                  <div className="h-1 w-12 bg-slate-100 mt-4 rounded-full" />
+                  <h2 className="text-5xl font-black leading-none italic uppercase tracking-tighter">Edit</h2>
+                  <h2 className="text-5xl font-black text-red-600 mt-2 leading-none italic uppercase tracking-tighter">Identitas</h2>
+                  <div className="h-2 w-20 bg-red-600/30 mt-6 rounded-full" />
                 </div>
                 <button 
                   onClick={() => { setMemberToEdit(null); setEditMemberNameValue(''); }} 
-                  className="p-3 hover:bg-slate-50 rounded-2xl transition-colors text-slate-300 hover:text-slate-600"
+                  className="p-4 hover:bg-zinc-800 rounded-3xl transition-colors text-zinc-600 hover:text-red-500"
                 >
-                  <X size={32} />
+                  <X size={36} />
                 </button>
               </div>
               
-              <div className="space-y-8">
-                <div className="space-y-3">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-2">Ubah Nama Teman</label>
+              <div className="space-y-10">
+                <div className="space-y-4">
+                  <label className="block text-[11px] font-black text-zinc-400 uppercase tracking-[0.4em] ml-4">Ubah Nama Terdaftar</label>
                   <input
                     autoFocus
                     type="text"
                     value={editMemberNameValue}
                     onChange={(e) => setEditMemberNameValue(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && updateMember()}
-                    placeholder="Contoh: Andi Wijaya"
-                    className="w-full bg-slate-50 border-4 border-slate-50 rounded-[1.5rem] py-5 px-6 focus:bg-white focus:border-indigo-100 outline-none transition-all text-xl font-bold text-slate-800"
+                    placeholder="E.G. ANDREAS BLACK"
+                    className="w-full bg-zinc-950 border-4 border-zinc-950 rounded-[2rem] py-7 px-8 focus:bg-black focus:border-red-600/30 outline-none transition-all text-2xl font-black text-white italic uppercase"
                   />
                 </div>
                 
                 <button 
                   onClick={updateMember}
                   disabled={!editMemberNameValue.trim() || editMemberNameValue === memberToEdit.name}
-                  className="w-full bg-teal-600 hover:bg-teal-700 text-white py-6 rounded-[1.5rem] font-black shadow-2xl shadow-teal-200 disabled:opacity-20 disabled:shadow-none transition-all active:scale-95 text-xl tracking-tight"
+                  className="w-full bg-red-600 hover:bg-red-700 text-white py-8 rounded-[2rem] font-black shadow-2xl shadow-red-950 disabled:opacity-20 disabled:shadow-none transition-all active:scale-95 text-2xl tracking-tighter uppercase italic"
                 >
-                  Perbarui Nama
+                  Perbarui Identitas
                 </button>
               </div>
             </motion.div>
