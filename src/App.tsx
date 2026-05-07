@@ -14,7 +14,9 @@ import {
   X,
   ChevronRight,
   Circle,
-  Menu
+  Menu,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -65,11 +67,19 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [memberToEdit, setMemberToEdit] = useState<Member | null>(null);
   const [editMemberNameValue, setEditMemberNameValue] = useState('');
+  const [isDark, setIsDark] = useState(() => {
+    const saved = localStorage.getItem('theme_preference');
+    return saved ? saved === 'dark' : true; // Default to dark as requested earlier
+  });
 
   // Persist to localStorage
   useEffect(() => {
     localStorage.setItem('circles_data', JSON.stringify(circles));
   }, [circles]);
+
+  useEffect(() => {
+    localStorage.setItem('theme_preference', isDark ? 'dark' : 'light');
+  }, [isDark]);
 
   const activeCircle = useMemo(() => 
     circles.find(c => c.id === activeCircleId) || circles[0], 
@@ -84,6 +94,7 @@ export default function App() {
   }, [activeCircle, searchQuery]);
 
   // --- Handlers ---
+  const toggleTheme = () => setIsDark(!isDark);
   const addMember = () => {
     if (!newMemberName.trim()) return;
     const newMember: Member = {
@@ -158,62 +169,87 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-50 font-sans selection:bg-red-900/30">
+    <div className={`min-h-screen font-sans transition-colors duration-300 ${isDark ? 'bg-zinc-950 text-zinc-50 selection:bg-red-900/30' : 'bg-slate-50 text-slate-900 selection:bg-red-100'}`}>
       {/* Mobile Top Header */}
-      <div className="md:hidden sticky top-0 z-40 bg-zinc-900/80 backdrop-blur-lg border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
+      <div className={`md:hidden sticky top-0 z-40 backdrop-blur-lg border-b px-4 py-3 flex items-center justify-between transition-colors ${isDark ? 'bg-zinc-900/80 border-zinc-800' : 'bg-white/80 border-slate-200'}`}>
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-red-600/20">
             <Users size={16} />
           </div>
-          <span className="font-bold text-zinc-100 tracking-tight">MARGA 13</span>
+          <span className={`font-bold tracking-tight ${isDark ? 'text-zinc-100' : 'text-slate-800'}`}>MARGA 13</span>
         </div>
-        <button 
-          onClick={() => setIsMobileMenuOpen(true)}
-          className="p-2 text-zinc-400 hover:bg-zinc-800 rounded-lg transition-colors"
-        >
-          <Menu size={24} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={toggleTheme}
+            className={`p-2 rounded-lg transition-colors ${isDark ? 'text-zinc-400 hover:bg-zinc-800' : 'text-slate-400 hover:bg-slate-100'}`}
+          >
+            {isDark ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+          <button 
+            onClick={() => setIsMobileMenuOpen(true)}
+            className={`p-2 rounded-lg transition-colors ${isDark ? 'text-zinc-400 hover:bg-zinc-800' : 'text-slate-400 hover:bg-slate-100'}`}
+          >
+            <Menu size={24} />
+          </button>
+        </div>
       </div>
 
       {/* Sidebar - Desktop */}
-      <div className="fixed left-0 top-0 h-full w-64 bg-zinc-900 border-r border-zinc-800 p-6 hidden md:block">
-        <div className="flex items-center gap-3 mb-10 px-2">
-          <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center text-white shadow-xl shadow-red-600/30">
-            <Users size={20} />
+      <div className={`fixed left-0 top-0 h-full w-64 border-r p-6 hidden md:flex flex-col transition-colors ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'}`}>
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-10 px-2">
+            <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center text-white shadow-xl shadow-red-600/30">
+              <Users size={20} />
+            </div>
+            <span className={`font-black text-xl tracking-tighter italic ${isDark ? 'text-zinc-100' : 'text-slate-900'}`}>MARGA 13</span>
           </div>
-          <span className="font-black text-xl tracking-tighter text-zinc-100 italic">MARGA 13</span>
+
+          <nav className="space-y-1">
+            <div className="flex items-center justify-between px-2 mb-4">
+              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${isDark ? 'text-zinc-500' : 'text-slate-400'}`}>Daftar Circle</span>
+              <button 
+                onClick={createNewCircle}
+                className={`p-1.5 rounded-md transition-colors ${isDark ? 'hover:bg-zinc-800 text-zinc-400' : 'hover:bg-slate-100 text-slate-400'} hover:text-red-500`}
+                title="Tambah Circle"
+                id="add-circle-sidebar"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+            {circles.map(c => (
+              <button
+                key={c.id}
+                onClick={() => setActiveCircleId(c.id)}
+                className={`w-full text-left px-3 py-3 rounded-xl flex items-center justify-between transition-all group ${
+                  activeCircleId === c.id 
+                  ? (isDark ? 'bg-red-600/10 text-red-500 border border-red-600/20' : 'bg-red-50 text-red-600 border border-red-100')
+                  : (isDark ? 'text-zinc-400 hover:bg-zinc-800 active:scale-[0.98]' : 'text-slate-600 hover:bg-slate-50 active:scale-[0.98]')
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Circle size={14} className={activeCircleId === c.id ? 'fill-red-500' : (isDark ? 'text-zinc-700' : 'text-slate-300')} />
+                  <span className={`font-bold truncate max-w-[140px] ${activeCircleId === c.id ? (isDark ? 'text-red-500' : 'text-red-600') : ''}`}>{c.name}</span>
+                </div>
+                <ChevronRight size={16} className={`transition-transform ${activeCircleId === c.id ? 'translate-x-0' : '-translate-x-2 opacity-0 group-hover:opacity-100'}`} />
+              </button>
+            ))}
+          </nav>
         </div>
 
-        <nav className="space-y-1">
-          <div className="flex items-center justify-between px-2 mb-4">
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Daftar Circle</span>
-            <button 
-              onClick={createNewCircle}
-              className="p-1.5 hover:bg-zinc-800 rounded-md text-zinc-400 hover:text-red-500 transition-colors"
-              title="Tambah Circle"
-              id="add-circle-sidebar"
-            >
-              <Plus size={16} />
-            </button>
-          </div>
-          {circles.map(c => (
-            <button
-              key={c.id}
-              onClick={() => setActiveCircleId(c.id)}
-              className={`w-full text-left px-3 py-3 rounded-xl flex items-center justify-between transition-all group ${
-                activeCircleId === c.id 
-                ? 'bg-red-600/10 text-red-500 shadow-sm border border-red-600/20' 
-                : 'text-zinc-400 hover:bg-zinc-800 active:scale-[0.98]'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Circle size={14} className={activeCircleId === c.id ? 'fill-red-500' : 'text-zinc-700'} />
-                <span className={`font-bold truncate max-w-[140px] ${activeCircleId === c.id ? 'text-red-500' : ''}`}>{c.name}</span>
-              </div>
-              <ChevronRight size={16} className={`transition-transform ${activeCircleId === c.id ? 'translate-x-0' : '-translate-x-2 opacity-0 group-hover:opacity-100'}`} />
-            </button>
-          ))}
-        </nav>
+        {/* Theme Toggle Desktop */}
+        <div className="pt-6 border-t border-zinc-800/10 mt-auto">
+          <button 
+            onClick={toggleTheme}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+              isDark 
+              ? 'bg-zinc-800/50 text-zinc-300 hover:bg-zinc-800' 
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            {isDark ? <Sun size={18} /> : <Moon size={18} />}
+            <span className="font-bold text-sm uppercase tracking-wider">{isDark ? 'Light Mode' : 'Dark Mode'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Mobile Menu Overlay */}
@@ -232,24 +268,24 @@ export default function App() {
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="absolute left-0 top-0 h-full w-4/5 bg-zinc-900 border-r border-zinc-800 shadow-2xl p-6"
+              className={`absolute left-0 top-0 h-full w-4/5 border-r shadow-2xl p-6 transition-colors ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200'}`}
             >
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center text-white">
                     <Users size={20} />
                   </div>
-                  <span className="font-bold text-xl tracking-tight text-white">Circle</span>
+                  <span className={`font-bold text-xl tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>Circle</span>
                 </div>
-                <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-zinc-500">
+                <button onClick={() => setIsMobileMenuOpen(false)} className={`p-2 ${isDark ? 'text-zinc-500' : 'text-slate-400'}`}>
                   <X size={24} />
                 </button>
               </div>
 
               <nav className="space-y-1">
                 <div className="flex items-center justify-between px-2 mb-4">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Circles Anda</span>
-                  <button onClick={createNewCircle} className="p-1 bg-zinc-800 rounded-md text-zinc-400">
+                  <span className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-zinc-500' : 'text-slate-400'}`}>Circles Anda</span>
+                  <button onClick={createNewCircle} className={`p-1 rounded-md transition-colors ${isDark ? 'bg-zinc-800 text-zinc-400' : 'bg-slate-100 text-slate-400'}`}>
                     <Plus size={16} />
                   </button>
                 </div>
@@ -257,11 +293,13 @@ export default function App() {
                   <button
                     key={c.id}
                     onClick={() => { setActiveCircleId(c.id); setIsMobileMenuOpen(false); }}
-                    className={`w-full text-left px-4 py-4 rounded-xl flex items-center gap-4 ${
-                      activeCircleId === c.id ? 'bg-red-600/20 text-red-500 border border-red-600/30' : 'text-zinc-400 hover:bg-zinc-800'
+                    className={`w-full text-left px-4 py-4 rounded-xl flex items-center gap-4 transition-all ${
+                      activeCircleId === c.id 
+                      ? (isDark ? 'bg-red-600/20 text-red-500 border border-red-600/30' : 'bg-red-50 text-red-600 border border-red-100') 
+                      : (isDark ? 'text-zinc-400 hover:bg-zinc-800' : 'text-slate-600 hover:bg-slate-50')
                     }`}
                   >
-                    <Circle size={14} className={activeCircleId === c.id ? 'fill-red-500' : 'text-zinc-700'} />
+                    <Circle size={14} className={activeCircleId === c.id ? 'fill-red-500' : (isDark ? 'text-zinc-700' : 'text-slate-300')} />
                     <span className="font-bold">{c.name}</span>
                   </button>
                 ))}
@@ -285,17 +323,17 @@ export default function App() {
                     onChange={(e) => setEditingNameValue(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && updateCircleName()}
                     onBlur={() => updateCircleName()}
-                    className="text-4xl md:text-6xl font-black tracking-tighter text-white bg-transparent border-b-8 border-red-600 outline-none focus:ring-0 px-0 py-2 italic uppercase"
+                    className={`text-4xl md:text-6xl font-black tracking-tighter bg-transparent border-b-8 border-red-600 outline-none focus:ring-0 px-0 py-2 italic uppercase ${isDark ? 'text-white' : 'text-slate-900'}`}
                   />
                 </div>
               ) : (
                 <div className="flex items-center gap-4">
-                  <h1 className="text-4xl md:text-7xl font-black tracking-tighter text-white leading-none uppercase italic">
+                  <h1 className={`text-4xl md:text-7xl font-black tracking-tighter leading-none uppercase italic ${isDark ? 'text-white' : 'text-slate-900'}`}>
                     {activeCircle.name}
                   </h1>
                   <button 
                     onClick={() => { setIsEditingCircleName(true); setEditingNameValue(activeCircle.name); }}
-                    className="p-2 text-zinc-700 hover:text-red-500 transition-colors md:opacity-0 md:group-hover:opacity-100"
+                    className={`p-2 transition-colors md:opacity-0 md:group-hover:opacity-100 ${isDark ? 'text-zinc-700 hover:text-red-500' : 'text-slate-300 hover:text-red-600'}`}
                     id="edit-btn-header"
                   >
                     <Edit2 size={24} />
@@ -303,11 +341,11 @@ export default function App() {
                 </div>
               )}
               <div className="flex flex-wrap items-center gap-4 mt-6">
-                <p className="text-zinc-200 font-black flex items-center gap-3 bg-zinc-900 px-5 py-2.5 rounded-full border border-zinc-800 shadow-xl text-sm uppercase tracking-widest">
+                <p className={`font-black flex items-center gap-3 px-5 py-2.5 rounded-full border shadow-xl text-sm uppercase tracking-widest ${isDark ? 'text-zinc-200 bg-zinc-900 border-zinc-800' : 'text-slate-700 bg-white border-slate-100'}`}>
                   <Users size={16} className="text-red-500" />
                   {activeCircle.members.length} Peserta
                 </p>
-                <p className="text-zinc-500 text-xs font-mono uppercase bg-zinc-900/50 px-4 py-2 rounded-full border border-zinc-800/50">
+                <p className={`text-xs font-mono uppercase px-4 py-2 rounded-full border ${isDark ? 'text-zinc-500 bg-zinc-900/50 border-zinc-800/50' : 'text-slate-400 bg-slate-100 border-slate-200'}`}>
                   EST. {new Date(activeCircle.createdAt).getFullYear()}
                 </p>
               </div>
@@ -326,7 +364,7 @@ export default function App() {
 
           {/* Search Bar */}
           <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-8 flex items-center pointer-events-none text-zinc-600 group-focus-within:text-red-500 transition-colors">
+            <div className={`absolute inset-y-0 left-0 pl-8 flex items-center pointer-events-none transition-colors ${isDark ? 'text-zinc-600 group-focus-within:text-red-500' : 'text-slate-300 group-focus-within:text-red-500'}`}>
               <Search size={28} />
             </div>
             <input
@@ -334,7 +372,7 @@ export default function App() {
               placeholder={`CARI NAMA DI ${activeCircle.name}...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-zinc-900/50 border-2 border-zinc-800/50 rounded-3xl py-7 pl-20 pr-10 shadow-2xl focus:ring-8 focus:ring-red-600/5 focus:border-red-600/40 outline-none transition-all placeholder:text-zinc-800 text-2xl font-black text-white italic uppercase tracking-tighter"
+              className={`w-full border-2 rounded-3xl py-7 pl-20 pr-10 shadow-2xl outline-none transition-all text-2xl font-black italic uppercase tracking-tighter ${isDark ? 'bg-zinc-900/50 border-zinc-800/50 focus:ring-8 focus:ring-red-600/5 focus:border-red-600/40 text-white placeholder:text-zinc-800' : 'bg-white border-slate-100 focus:ring-8 focus:ring-red-100 focus:border-red-200 text-slate-900 placeholder:text-slate-200'}`}
             />
           </div>
         </header>
@@ -350,17 +388,17 @@ export default function App() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.8, y: -30 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 400 }}
-                className="bg-zinc-900/40 p-8 rounded-[2rem] border border-zinc-800/50 shadow-sm hover:shadow-2xl hover:shadow-red-600/10 hover:-translate-y-2 hover:border-red-600/30 transition-all group relative overflow-hidden backdrop-blur-sm"
+                className={`p-8 rounded-[2rem] border shadow-sm hover:shadow-2xl transition-all group relative overflow-hidden backdrop-blur-sm ${isDark ? 'bg-zinc-900/40 border-zinc-800/50 hover:shadow-red-600/10 hover:-translate-y-2 hover:border-red-600/30' : 'bg-white border-slate-100 hover:shadow-slate-200 hover:-translate-y-2 hover:border-slate-200'}`}
               >
                 <div className="flex items-center gap-6 relative z-10">
-                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-white font-black text-3xl shadow-2xl shadow-red-950 group-hover:rotate-12 transition-transform">
+                  <div className={`w-20 h-20 rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-2xl group-hover:rotate-12 transition-transform ${isDark ? 'bg-gradient-to-br from-red-600 to-red-800 shadow-red-950' : 'bg-red-600 shadow-red-100'}`}>
                     {member.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-black text-zinc-100 text-2xl truncate group-hover:text-red-500 transition-colors leading-tight italic uppercase">{member.name}</h3>
+                    <h3 className={`font-black text-2xl truncate transition-colors leading-tight italic uppercase ${isDark ? 'text-zinc-100 group-hover:text-red-500' : 'text-slate-800 group-hover:text-red-600'}`}>{member.name}</h3>
                     <div className="flex items-center gap-3 mt-2">
-                      <div className="w-2 h-2 rounded-full bg-red-600 shadow-[0_0_10px_rgba(220,38,38,0.8)]" />
-                      <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.3em]">
+                      <div className={`w-2 h-2 rounded-full ${isDark ? 'bg-red-600 shadow-[0_0_10px_rgba(220,38,38,0.8)]' : 'bg-red-500'}`} />
+                      <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${isDark ? 'text-zinc-500' : 'text-slate-400'}`}>
                         Verified Member
                       </p>
                     </div>
@@ -371,14 +409,14 @@ export default function App() {
                         setMemberToEdit(member);
                         setEditMemberNameValue(member.name);
                       }}
-                      className="p-3 text-zinc-600 hover:text-red-500 hover:bg-red-600/10 rounded-xl transition-all md:opacity-0 md:group-hover:opacity-100"
+                      className={`p-3 rounded-xl transition-all md:opacity-0 md:group-hover:opacity-100 ${isDark ? 'text-zinc-600 hover:text-red-500 hover:bg-red-600/10' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'}`}
                       title="Edit"
                     >
                       <Edit2 size={20} />
                     </button>
                     <button 
                       onClick={() => removeMember(member.id)}
-                      className="p-3 text-zinc-600 hover:text-red-600 hover:bg-red-600/10 rounded-xl transition-all md:opacity-0 md:group-hover:opacity-100"
+                      className={`p-3 rounded-xl transition-all md:opacity-0 md:group-hover:opacity-100 ${isDark ? 'text-zinc-600 hover:text-red-600 hover:bg-red-600/10' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'}`}
                       title="Hapus"
                     >
                       <Trash2 size={20} />
@@ -387,7 +425,7 @@ export default function App() {
                 </div>
                 
                 {/* Visual Flair */}
-                <div className="absolute -bottom-12 -right-12 w-40 h-40 bg-red-600/2 rounded-full blur-3xl group-hover:bg-red-600/5 transition-colors duration-700" />
+                <div className={`absolute -bottom-12 -right-12 w-40 h-40 rounded-full blur-3xl transition-colors duration-700 ${isDark ? 'bg-red-600/2 group-hover:bg-red-600/5' : 'bg-slate-50 group-hover:bg-red-50'}`} />
               </motion.div>
             ))}
           </AnimatePresence>
@@ -396,19 +434,19 @@ export default function App() {
             <motion.div 
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }}
-              className="col-span-full flex flex-col items-center justify-center py-40 text-center rounded-[3rem] border-4 border-dashed border-zinc-800 bg-zinc-900/20"
+              className={`col-span-full flex flex-col items-center justify-center py-40 text-center rounded-[3rem] border-4 border-dashed transition-colors ${isDark ? 'border-zinc-800 bg-zinc-900/20' : 'border-slate-100 bg-slate-50/50'}`}
             >
-              <div className="w-32 h-32 bg-zinc-800/50 rounded-full flex items-center justify-center text-zinc-700 mb-10 group relative">
+              <div className={`w-32 h-32 rounded-full flex items-center justify-center mb-10 group relative transition-colors ${isDark ? 'bg-zinc-800/50 text-zinc-700' : 'bg-slate-100 text-slate-200'}`}>
                 <Users size={64} className="group-hover:text-red-600 transition-colors" />
-                <div className="absolute inset-0 bg-red-600/5 rounded-full blur-2xl animate-pulse" />
+                <div className={`absolute inset-0 rounded-full blur-2xl animate-pulse ${isDark ? 'bg-red-600/5' : 'bg-red-500/5'}`} />
               </div>
-              <h3 className="text-3xl font-black text-zinc-300 tracking-tighter uppercase italic">Tidak Menemukan Nama</h3>
-              <p className="text-zinc-500 max-w-sm mx-auto mt-4 text-xl font-medium leading-relaxed">
+              <h3 className={`text-3xl font-black tracking-tighter uppercase italic ${isDark ? 'text-zinc-300' : 'text-slate-800'}`}>Tidak Menemukan Nama</h3>
+              <p className={`max-w-sm mx-auto mt-4 text-xl font-medium leading-relaxed ${isDark ? 'text-zinc-500' : 'text-slate-400'}`}>
                 Waduh, nggak ada yang namanya "{searchQuery}" di sini.
               </p>
               <button 
                 onClick={() => setSearchQuery('')}
-                className="mt-10 bg-zinc-800 hover:bg-red-600 text-zinc-100 font-black text-lg px-8 py-3 rounded-full transition-all active:scale-95 uppercase tracking-widest"
+                className={`mt-10 font-black text-lg px-8 py-3 rounded-full transition-all active:scale-95 uppercase tracking-widest ${isDark ? 'bg-zinc-800 hover:bg-red-600 text-zinc-100' : 'bg-white hover:bg-red-600 hover:text-white text-slate-400 shadow-sm border border-slate-100'}`}
                 id="reset-search"
               >
                 Reset Cari
@@ -419,19 +457,19 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="md:ml-64 p-16 text-center border-t border-zinc-900 bg-black/20">
+      <footer className={`md:ml-64 p-16 text-center border-t transition-colors ${isDark ? 'border-zinc-900 bg-black/20' : 'border-slate-100 bg-white'}`}>
         <div className="max-w-md mx-auto space-y-6">
           <div className="flex justify-center gap-3">
-            {[1, 2, 3].map(i => <div key={i} className="w-12 h-1 bg-zinc-800 rounded-full group-hover:bg-red-600 transition-colors" />)}
+            {[1, 2, 3].map(i => <div key={i} className={`w-12 h-1 rounded-full group-hover:bg-red-600 transition-colors ${isDark ? 'bg-zinc-800' : 'bg-slate-100'}`} />)}
           </div>
-          <p className="text-zinc-500 font-black text-base tracking-[0.5em] uppercase italic">
+          <p className={`font-black text-base tracking-[0.5em] uppercase italic ${isDark ? 'text-zinc-500' : 'text-slate-300'}`}>
             MARGA <span className="text-red-600">13</span>
           </p>
           <div className="pt-4 space-y-2">
-            <p className="text-[10px] text-zinc-700 font-mono uppercase tracking-widest">
+            <p className={`text-[10px] font-mono uppercase tracking-widest ${isDark ? 'text-zinc-700' : 'text-slate-300'}`}>
               Secured & local persistence active
             </p>
-            <p className="text-[9px] text-zinc-800 uppercase tracking-widest">
+            <p className={`text-[9px] uppercase tracking-widest ${isDark ? 'text-zinc-800' : 'text-slate-200'}`}>
               v1.5.0-alpha elite
             </p>
           </div>
@@ -454,19 +492,19 @@ export default function App() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.8, y: 100 }}
               transition={{ type: 'spring', damping: 25 }}
-              className="relative w-full max-w-lg bg-zinc-900 rounded-[3rem] shadow-[0_0_100px_rgba(220,38,38,0.1)] p-12 overflow-hidden border border-zinc-800"
+              className={`relative w-full max-w-lg rounded-[3rem] p-12 overflow-hidden border transition-colors ${isDark ? 'bg-zinc-900 border-zinc-800 shadow-[0_0_100px_rgba(220,38,38,0.1)]' : 'bg-white border-slate-100 shadow-2xl'}`}
             >
               <div className="absolute top-0 left-0 w-full h-4 bg-gradient-to-r from-red-600 via-red-500 to-red-800" />
               
-              <div className="flex justify-between items-start mb-14 text-white">
-                <div>
+              <div className="flex justify-between items-start mb-14">
+                <div className={isDark ? 'text-white' : 'text-slate-900'}>
                   <h2 className="text-5xl font-black leading-none italic uppercase tracking-tighter">Tambah</h2>
                   <h2 className="text-5xl font-black text-red-600 mt-2 leading-none italic uppercase tracking-tighter">Peserta</h2>
-                  <div className="h-2 w-20 bg-red-600/30 mt-6 rounded-full" />
+                  <div className={`h-2 w-20 mt-6 rounded-full ${isDark ? 'bg-red-600/30' : 'bg-red-100'}`} />
                 </div>
                 <button 
                   onClick={() => setIsAddingMember(false)} 
-                  className="p-4 hover:bg-zinc-800 rounded-3xl transition-colors text-zinc-600 hover:text-red-500"
+                  className={`p-4 rounded-3xl transition-colors ${isDark ? 'hover:bg-zinc-800 text-zinc-600 hover:text-red-500' : 'hover:bg-slate-50 text-slate-300 hover:text-red-600'}`}
                 >
                   <X size={36} />
                 </button>
@@ -474,7 +512,7 @@ export default function App() {
               
               <div className="space-y-10">
                 <div className="space-y-4">
-                  <label className="block text-[11px] font-black text-zinc-400 uppercase tracking-[0.4em] ml-4">Informasi Nama Teman</label>
+                  <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ml-4 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Informasi Nama Teman</label>
                   <input
                     autoFocus
                     type="text"
@@ -482,14 +520,14 @@ export default function App() {
                     onChange={(e) => setNewMemberName(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && addMember()}
                     placeholder="E.G. ANDREAS BLACK"
-                    className="w-full bg-zinc-950 border-4 border-zinc-950 rounded-[1.5rem] py-7 px-8 focus:bg-black focus:border-red-600/30 outline-none transition-all text-2xl font-black text-white italic uppercase placeholder:text-zinc-800"
+                    className={`w-full border-4 rounded-[1.5rem] py-7 px-8 outline-none transition-all text-2xl font-black italic uppercase ${isDark ? 'bg-zinc-950 border-zinc-950 focus:bg-black focus:border-red-600/30 text-white placeholder:text-zinc-800' : 'bg-slate-50 border-slate-50 focus:bg-white focus:border-red-100 text-slate-900 placeholder:text-slate-200'}`}
                   />
                 </div>
                 
                 <button 
                   onClick={addMember}
                   disabled={!newMemberName.trim()}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white py-8 rounded-[1.5rem] font-black shadow-2xl shadow-red-950 disabled:opacity-20 disabled:shadow-none transition-all active:scale-95 text-2xl tracking-tighter italic uppercase"
+                  className="w-full bg-red-600 hover:bg-red-700 text-white py-8 rounded-[1.5rem] font-black shadow-2xl disabled:opacity-20 transition-all active:scale-95 text-2xl tracking-tighter italic uppercase shadow-red-950"
                 >
                   Simpan Peserta Baru
                 </button>
@@ -515,19 +553,19 @@ export default function App() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.8, y: 100 }}
               transition={{ type: 'spring', damping: 25 }}
-              className="relative w-full max-w-lg bg-zinc-900 rounded-[3rem] shadow-[0_0_100px_rgba(220,38,38,0.1)] p-12 overflow-hidden border border-zinc-800"
+              className={`relative w-full max-w-lg rounded-[3rem] p-12 overflow-hidden border transition-colors ${isDark ? 'bg-zinc-900 border-zinc-800 shadow-[0_0_100px_rgba(220,38,38,0.1)]' : 'bg-white border-slate-100 shadow-2xl'}`}
             >
               <div className="absolute top-0 left-0 w-full h-4 bg-gradient-to-r from-red-600 to-zinc-900" />
               
-              <div className="flex justify-between items-start mb-14 text-white">
-                <div>
+              <div className="flex justify-between items-start mb-14">
+                <div className={isDark ? 'text-white' : 'text-slate-900'}>
                   <h2 className="text-5xl font-black leading-none italic uppercase tracking-tighter">Edit</h2>
                   <h2 className="text-5xl font-black text-red-600 mt-2 leading-none italic uppercase tracking-tighter">Identitas</h2>
-                  <div className="h-2 w-20 bg-red-600/30 mt-6 rounded-full" />
+                  <div className={`h-2 w-20 mt-6 rounded-full ${isDark ? 'bg-red-600/30' : 'bg-red-100'}`} />
                 </div>
                 <button 
                   onClick={() => { setMemberToEdit(null); setEditMemberNameValue(''); }} 
-                  className="p-4 hover:bg-zinc-800 rounded-3xl transition-colors text-zinc-600 hover:text-red-500"
+                  className={`p-4 rounded-3xl transition-colors ${isDark ? 'hover:bg-zinc-800 text-zinc-600 hover:text-red-500' : 'hover:bg-slate-50 text-slate-300 hover:text-red-600'}`}
                 >
                   <X size={36} />
                 </button>
@@ -535,7 +573,7 @@ export default function App() {
               
               <div className="space-y-10">
                 <div className="space-y-4">
-                  <label className="block text-[11px] font-black text-zinc-400 uppercase tracking-[0.4em] ml-4">Ubah Nama Terdaftar</label>
+                  <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ml-4 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Ubah Nama Terdaftar</label>
                   <input
                     autoFocus
                     type="text"
@@ -543,14 +581,14 @@ export default function App() {
                     onChange={(e) => setEditMemberNameValue(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && updateMember()}
                     placeholder="E.G. ANDREAS BLACK"
-                    className="w-full bg-zinc-950 border-4 border-zinc-950 rounded-[2rem] py-7 px-8 focus:bg-black focus:border-red-600/30 outline-none transition-all text-2xl font-black text-white italic uppercase"
+                    className={`w-full border-4 rounded-[2rem] py-7 px-8 outline-none transition-all text-2xl font-black italic uppercase ${isDark ? 'bg-zinc-950 border-zinc-950 focus:bg-black focus:border-red-600/30 text-white placeholder:text-zinc-800' : 'bg-slate-50 border-slate-50 focus:bg-white focus:border-red-100 text-slate-900 placeholder:text-slate-200'}`}
                   />
                 </div>
                 
                 <button 
                   onClick={updateMember}
                   disabled={!editMemberNameValue.trim() || editMemberNameValue === memberToEdit.name}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white py-8 rounded-[2rem] font-black shadow-2xl shadow-red-950 disabled:opacity-20 disabled:shadow-none transition-all active:scale-95 text-2xl tracking-tighter uppercase italic"
+                  className="w-full bg-red-600 hover:bg-red-700 text-white py-8 rounded-[2rem] font-black shadow-2xl disabled:opacity-20 transition-all active:scale-95 text-2xl tracking-tighter uppercase italic shadow-red-950"
                 >
                   Perbarui Identitas
                 </button>
