@@ -695,7 +695,10 @@ export default function App() {
               </div>
             </motion.div>
           )}
+        </div>
 
+        {/* Schedule Section */}
+        <div className="grid grid-cols-1 gap-8 mb-12">
           {activeCircle.nextMabar && (
             <motion.div 
               initial={{ opacity: 0, y: -20 }}
@@ -901,7 +904,7 @@ export default function App() {
                     <div className="flex items-center gap-3 mt-2">
                       <div className={`w-2 h-2 rounded-full ${onlineUsers.includes(member.id) ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]' : (isDark ? 'bg-zinc-800' : 'bg-slate-200')} ${claimedMemberId === member.id ? 'ring-2 ring-offset-2 ring-red-500 ring-offset-zinc-900' : ''}`} />
                       <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${onlineUsers.includes(member.id) ? 'text-green-500' : (isDark ? 'text-zinc-500' : 'text-slate-400')}`}>
-                        {onlineUsers.includes(member.id) ? (claimedMemberId === member.id ? 'ANDA ONLINE' : 'WA ONLINE') : 'WA OFFLINE'}
+                        {onlineUsers.includes(member.id) ? (claimedMemberId === member.id ? 'ANDA AKTIF' : 'AKTIF DI WEB') : 'OFF DI WEB'}
                       </p>
                     </div>
                     {/* Skill Progress */}
