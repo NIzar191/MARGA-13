@@ -38,6 +38,7 @@ interface Member {
   nickname?: string;
   avatarUrl?: string;
   phone?: string;
+  skillLevel?: number; // 0-100
   addedAt: number;
 }
 
@@ -77,12 +78,14 @@ export default function App() {
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberAvatar, setNewMemberAvatar] = useState<string | undefined>();
+  const [newMemberSkill, setNewMemberSkill] = useState<number>(50);
   const [isEditingCircleName, setIsEditingCircleName] = useState(false);
   const [editingNameValue, setEditingNameValue] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [memberToEdit, setMemberToEdit] = useState<Member | null>(null);
   const [editMemberNameValue, setEditMemberNameValue] = useState('');
   const [editMemberAvatar, setEditMemberAvatar] = useState<string | undefined>();
+  const [editMemberSkill, setEditMemberSkill] = useState<number>(50);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [newMemberPhone, setNewMemberPhone] = useState('');
   const [editMemberPhone, setEditMemberPhone] = useState('');
@@ -143,6 +146,7 @@ export default function App() {
       name: newMemberName.trim(),
       avatarUrl: newMemberAvatar,
       phone: newMemberPhone.trim(),
+      skillLevel: newMemberSkill,
       addedAt: Date.now()
     };
 
@@ -194,7 +198,8 @@ export default function App() {
               ...m, 
               name: editMemberNameValue.trim(),
               avatarUrl: editMemberAvatar,
-              phone: editMemberPhone.trim()
+              phone: editMemberPhone.trim(),
+              skillLevel: editMemberSkill
             } : m
           )
         };
@@ -531,6 +536,22 @@ export default function App() {
                         {onlineUsers.includes(member.id) ? 'WhatsApp Online' : 'WhatsApp Offline'}
                       </p>
                     </div>
+                    {/* Skill Progress */}
+                    <div className="mt-4 space-y-2">
+                      <div className="flex justify-between items-end">
+                        <p className={`text-[9px] font-black uppercase tracking-widest ${isDark ? 'text-zinc-700' : 'text-slate-300'}`}>Skill Progress</p>
+                        <p className={`text-[10px] font-black italic ${member.skillLevel && member.skillLevel > 80 ? 'text-red-500' : (isDark ? 'text-zinc-500' : 'text-slate-400')}`}>
+                          {member.skillLevel || 0}% {member.skillLevel && member.skillLevel > 80 ? 'JAGO' : member.skillLevel && member.skillLevel < 30 ? 'PULA' : 'PROGRES'}
+                        </p>
+                      </div>
+                      <div className={`h-1.5 w-full rounded-full overflow-hidden ${isDark ? 'bg-zinc-800' : 'bg-slate-100'}`}>
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${member.skillLevel || 0}%` }}
+                          className={`h-full bg-gradient-to-r ${member.skillLevel && member.skillLevel > 80 ? 'from-red-600 to-red-400 shadow-[0_0_10px_rgba(220,38,38,0.4)]' : 'from-zinc-600 to-zinc-400'}`}
+                        />
+                      </div>
+                    </div>
                   </div>
                   <div className="flex flex-col gap-2">
                     {member.phone && (
@@ -550,6 +571,7 @@ export default function App() {
                         setEditMemberNameValue(member.name);
                         setEditMemberAvatar(member.avatarUrl);
                         setEditMemberPhone(member.phone || '');
+                        setEditMemberSkill(member.skillLevel || 50);
                       }}
                       className={`p-3 rounded-xl transition-all md:opacity-0 md:group-hover:opacity-100 ${isDark ? 'text-zinc-600 hover:text-red-500 hover:bg-red-600/10' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'}`}
                       title="Edit"
@@ -703,6 +725,23 @@ export default function App() {
                     className={`w-full border-4 rounded-[1.5rem] py-7 px-8 outline-none transition-all text-2xl font-black italic uppercase ${isDark ? 'bg-zinc-950 border-zinc-950 focus:bg-black focus:border-red-600/30 text-white placeholder:text-zinc-800' : 'bg-slate-50 border-slate-50 focus:bg-white focus:border-red-100 text-slate-900 placeholder:text-slate-200'}`}
                   />
                 </div>
+
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center ml-4">
+                    <label className={`text-[11px] font-black uppercase tracking-[0.4em] ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Progres Skill: {newMemberSkill}%</label>
+                    <span className={`text-[10px] font-bold italic uppercase ${newMemberSkill > 80 ? 'text-red-500' : (isDark ? 'text-zinc-600' : 'text-slate-300')}`}>
+                      {newMemberSkill > 80 ? 'Jago Banget' : newMemberSkill < 30 ? 'Beban Circle' : 'Standar'}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={newMemberSkill}
+                    onChange={(e) => setNewMemberSkill(parseInt(e.target.value))}
+                    className="w-full h-8 accent-red-600 cursor-pointer"
+                  />
+                </div>
                 
                 <button 
                   onClick={addMember}
@@ -800,6 +839,23 @@ export default function App() {
                     onChange={(e) => setEditMemberPhone(e.target.value)}
                     placeholder="E.G. 628123456789"
                     className={`w-full border-4 rounded-[1.5rem] py-7 px-8 outline-none transition-all text-2xl font-black italic uppercase ${isDark ? 'bg-zinc-950 border-zinc-950 focus:bg-black focus:border-red-600/30 text-white placeholder:text-zinc-800' : 'bg-slate-50 border-slate-50 focus:bg-white focus:border-red-100 text-slate-900 placeholder:text-slate-200'}`}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center ml-4">
+                    <label className={`text-[11px] font-black uppercase tracking-[0.4em] ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Progres Skill: {editMemberSkill}%</label>
+                    <span className={`text-[10px] font-bold italic uppercase ${editMemberSkill > 80 ? 'text-red-500' : (isDark ? 'text-zinc-600' : 'text-slate-300')}`}>
+                      {editMemberSkill > 80 ? 'Jago Banget' : editMemberSkill < 30 ? 'Beban Circle' : 'Standar'}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={editMemberSkill}
+                    onChange={(e) => setEditMemberSkill(parseInt(e.target.value))}
+                    className="w-full h-8 accent-red-600 cursor-pointer"
                   />
                 </div>
                 
