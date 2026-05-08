@@ -25,9 +25,18 @@ import {
   ExternalLink,
   MessageCircle,
   Trophy,
+  Crosshair,
+  Swords,
+  PieChart,
+  History,
+  ShieldCheck,
+  TrendingUp,
+  Volume2,
+  VolumeX,
+  Clock,
   Zap,
   Activity,
-  Clock
+  Settings2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { io } from 'socket.io-client';
@@ -58,6 +67,7 @@ interface CircleData {
   mabarLocation?: string;
   activities?: { id: string; text: string; time: number }[];
   moments?: { id: string; url: string; caption?: string; time: number }[];
+  matches?: { id: string; opponent: string; score: string; result: 'WIN' | 'LOSE'; date: number }[];
   socialLinks?: { type: string; url: string }[];
   createdAt: number;
 }
@@ -105,6 +115,7 @@ export default function App() {
           })),
           activities: circle.activities || [],
           moments: circle.moments || [],
+          matches: circle.matches || [],
           socialLinks: circle.socialLinks || []
         }));
       } catch (e) {
@@ -141,10 +152,43 @@ export default function App() {
   const [momentImage, setMomentImage] = useState<string | undefined>();
   const [announcementValue, setAnnouncementValue] = useState('');
   const [whatsappLinkValue, setWhatsappLinkValue] = useState('');
+  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
+  const [isAddingMatch, setIsAddingMatch] = useState(false);
+  const [matchOpponent, setMatchOpponent] = useState('');
+  const [matchScore, setMatchScore] = useState('');
+  const [matchResult, setMatchResult] = useState<'WIN' | 'LOSE'>('WIN');
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [isDark, setIsDark] = useState(() => {
     const saved = localStorage.getItem('theme_preference');
     return saved ? saved === 'dark' : true; // Default to dark as requested earlier
   });
+
+  const playSound = (freq: number = 880, type: OscillatorType = 'sine', duration: number = 0.1) => {
+    if (!isAudioEnabled) return;
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscillator.type = type;
+      oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + duration);
+    } catch (e) {
+      console.warn('Audio feedback failed');
+    }
+  };
+
+  const toggleDarkMode = () => {
+    setIsDark(!isDark);
+    playSound(440);
+  };
 
   // Persist to localStorage
   useEffect(() => {
@@ -240,6 +284,29 @@ export default function App() {
       }
       return c;
     }));
+    playSound(440, 'square');
+  };
+
+  const addMatch = () => {
+    if (!matchOpponent || !matchScore) return;
+    const newMatch = {
+      id: Math.random().toString(36).substr(2, 9),
+      opponent: matchOpponent.toUpperCase(),
+      score: matchScore,
+      result: matchResult,
+      date: Date.now()
+    };
+    setCircles(prev => prev.map(c => {
+      if (c.id === activeCircleId) {
+        addActivity(`Match Baru: ${newMatch.result} vs ${newMatch.opponent}`);
+        return { ...c, matches: [newMatch, ...(c.matches || [])] };
+      }
+      return c;
+    }));
+    playSound(880, 'sine', 0.2);
+    setMatchOpponent('');
+    setMatchScore('');
+    setIsAddingMatch(false);
   };
 
   const getTimeRemaining = (targetDate: number) => {
@@ -272,12 +339,12 @@ export default function App() {
   }, [activeCircle.members, searchQuery, onlineUsers]);
 
   // --- Handlers ---
-  const toggleTheme = () => setIsDark(!isDark);
+  const toggleTheme = toggleDarkMode;
   const addMember = () => {
     if (!newMemberName.trim()) return;
     const newMember: Member = {
       id: Math.random().toString(36).substr(2, 9),
-      name: newMemberName.trim(),
+      name: newMemberName.trim().toUpperCase(),
       avatarUrl: newMemberAvatar,
       phone: newMemberPhone.trim(),
       skillLevel: newMemberSkill,
@@ -289,10 +356,11 @@ export default function App() {
     setCircles(prev => prev.map(c => {
       if (c.id === activeCircleId) {
         addActivity(`${newMember.name} bergabung ke Circle!`);
-        return { ...c, members: [...c.members, newMember] };
+        return { ...c, members: [newMember, ...c.members] };
       }
       return c;
     }));
+    playSound(880, 'sine', 0.2);
     setNewMemberName('');
     setNewMemberAvatar(undefined);
     setNewMemberPhone('');
@@ -301,7 +369,7 @@ export default function App() {
 
   const removeMember = (id: string) => {
     const member = activeCircle.members.find(m => m.id === id);
-    if (!confirm('Hapus teman ini?')) return;
+    if (!confirm('Keluarkan member ini dari circle?')) return;
     setCircles(prev => prev.map(c => {
       if (c.id === activeCircleId) {
         if (member) addActivity(`${member.name} telah dikeluarkan.`);
@@ -309,6 +377,7 @@ export default function App() {
       }
       return c;
     }));
+    playSound(330, 'sawtooth', 0.1);
   };
 
   const updateCircleName = () => {
@@ -337,7 +406,7 @@ export default function App() {
           members: c.members.map(m => 
             m.id === memberToEdit.id ? { 
               ...m, 
-              name: editMemberNameValue.trim(),
+              name: editMemberNameValue.trim().toUpperCase(),
               avatarUrl: editMemberAvatar,
               phone: editMemberPhone.trim(),
               skillLevel: editMemberSkill,
@@ -349,6 +418,7 @@ export default function App() {
       }
       return c;
     }));
+    playSound(660, 'sine', 0.15);
     setMemberToEdit(null);
     setEditMemberNameValue('');
     setEditMemberAvatar(undefined);
@@ -656,6 +726,23 @@ export default function App() {
                   EST. {new Date(activeCircle.createdAt).getFullYear()}
                 </p>
                 
+                {/* Visual Settings */}
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => { setIsAudioEnabled(!isAudioEnabled); playSound(660); }}
+                    className={`p-2.5 rounded-xl border transition-all ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-100 shadow-sm'}`}
+                    title="Toggle Audio"
+                  >
+                    {isAudioEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                  </button>
+                  <button 
+                    onClick={() => { toggleDarkMode(); playSound(550); }}
+                    className={`p-2.5 rounded-xl border transition-all ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-100 shadow-sm'}`}
+                  >
+                   {isDark ? <Sun size={14} /> : <Moon size={14} />}
+                  </button>
+                </div>
+
                 {/* Social Shortcuts */}
                 <div className="flex items-center gap-2">
                   <button 
@@ -1011,23 +1098,32 @@ export default function App() {
                         {onlineUsers.includes(member.id) ? (claimedMemberId === member.id ? 'ANDA AKTIF' : 'AKTIF DI WEB') : 'OFF DI WEB'}
                       </p>
                     </div>
+
                     {/* Skill Progress */}
-                    <div className="mt-4 space-y-2">
-                      <div className="flex justify-between items-end">
-                        <p className={`text-[9px] font-black uppercase tracking-widest ${isDark ? 'text-zinc-700' : 'text-slate-300'}`}>Skill Progress</p>
-                        <p className={`text-[10px] font-black italic ${member.skillLevel && member.skillLevel > 80 ? 'text-red-500' : (isDark ? 'text-zinc-500' : 'text-slate-400')}`}>
-                          {member.skillLevel || 0}% {member.skillLevel && member.skillLevel > 80 ? 'JAGO' : member.skillLevel && member.skillLevel < 30 ? 'PULA' : 'PROGRES'}
-                        </p>
+                    <div className="mt-5">
+                      <div className="flex justify-between items-end mb-1.5">
+                        <span className={`text-[8px] font-black uppercase tracking-widest ${isDark ? 'text-zinc-600' : 'text-slate-400'}`}>Combat Power</span>
+                        <span className={`text-[10px] font-bold ${isDark ? 'text-zinc-400' : 'text-slate-900'}`}>{member.skillLevel}%</span>
                       </div>
-                      <div className={`h-1.5 w-full rounded-full overflow-hidden ${isDark ? 'bg-zinc-800' : 'bg-slate-100'}`}>
+                      <div className={`w-full h-1 rounded-full overflow-hidden ${isDark ? 'bg-zinc-800' : 'bg-slate-100'}`}>
                         <motion.div 
                           initial={{ width: 0 }}
                           animate={{ width: `${member.skillLevel || 0}%` }}
-                          className={`h-full bg-gradient-to-r ${member.skillLevel && member.skillLevel > 80 ? 'from-red-600 to-red-400 shadow-[0_0_10px_rgba(220,38,38,0.4)]' : 'from-zinc-600 to-zinc-400'}`}
+                          className={`h-full ${member.skillLevel && member.skillLevel > 80 ? 'bg-red-600 shadow-[0_0_10px_rgba(220,38,38,0.3)]' : 'bg-zinc-500'}`}
                         />
                       </div>
                     </div>
+                    
+                    <div className="mt-6 flex gap-2">
+                       <button 
+                        onClick={() => { setSelectedMember(member); playSound(770); }}
+                        className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all active:scale-95 border ${isDark ? 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-zinc-300' : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600 shadow-sm'}`}
+                      >
+                        Detail Profile
+                      </button>
+                    </div>
                   </div>
+
                   <div className="flex flex-col gap-2">
                     {member.phone && (
                       <a 
@@ -1047,15 +1143,16 @@ export default function App() {
                         setEditMemberAvatar(member.avatarUrl);
                         setEditMemberPhone(member.phone || '');
                         setEditMemberSkill(member.skillLevel || 50);
+                        playSound(660);
                       }}
                       className={`p-3 rounded-xl transition-all md:opacity-0 md:group-hover:opacity-100 ${isDark ? 'text-zinc-600 hover:text-red-500 hover:bg-red-600/10' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'}`}
                       title="Edit"
                     >
-                      <Edit2 size={20} />
+                      <Settings2 size={20} />
                     </button>
                     <button 
-                      onClick={() => removeMember(member.id)}
-                      className={`p-3 rounded-xl transition-all md:opacity-0 md:group-hover:opacity-100 ${isDark ? 'text-zinc-600 hover:text-red-600 hover:bg-red-600/10' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'}`}
+                      onClick={() => { removeMember(member.id); playSound(330); }}
+                      className={`p-3 rounded-xl transition-all md:opacity-0 md:group-hover:opacity-100 ${isDark ? 'text-zinc-600 hover:text-red-500 hover:bg-red-600/10' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'}`}
                       title="Hapus"
                     >
                       <Trash2 size={20} />
@@ -1092,6 +1189,64 @@ export default function App() {
               </button>
             </motion.div>
           )}
+        </div>
+
+        {/* Match History Tracker */}
+        <div className="mb-20">
+          <div className="flex justify-between items-center mb-8">
+            <div className="flex items-center gap-4">
+              <History size={20} className="text-red-600" />
+              <h2 className={`text-xl font-black italic uppercase tracking-tighter ${isDark ? 'text-white' : 'text-slate-900'}`}>Rekap Pertandingan</h2>
+            </div>
+            <button 
+              onClick={() => { setIsAddingMatch(true); playSound(990); }}
+              className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${isDark ? 'bg-red-600/10 text-red-500 border border-red-600/20 hover:bg-red-600/20' : 'bg-red-50 text-red-600 border border-red-100 hover:bg-red-100'}`}
+            >
+              <Swords size={14} />
+              Input Hasil Match
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {activeCircle.matches?.length ? (
+              activeCircle.matches.map((match) => (
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  key={match.id}
+                  className={`p-6 rounded-[2rem] border relative overflow-hidden group ${
+                    match.result === 'WIN' 
+                    ? (isDark ? 'bg-green-600/5 border-green-600/20' : 'bg-green-50 border-green-100')
+                    : (isDark ? 'bg-red-600/5 border-red-600/20' : 'bg-red-50 border-red-100')
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-4">
+                     <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tighter ${
+                       match.result === 'WIN' ? 'bg-green-600 text-white shadow-lg shadow-green-600/20' : 'bg-red-600 text-white shadow-lg shadow-red-600/20'
+                     }`}>
+                       {match.result}
+                     </span>
+                     <span className="text-[10px] font-mono text-zinc-500 uppercase">{new Date(match.date).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className={`text-[9px] font-black uppercase tracking-[0.3em] ${isDark ? 'text-zinc-600' : 'text-slate-400'}`}>Lawan</p>
+                      <h4 className="text-2xl font-black italic uppercase tracking-tighter truncate max-w-[150px]">{match.opponent}</h4>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-[9px] font-black uppercase tracking-[0.3em] ${isDark ? 'text-zinc-600' : 'text-slate-400'}`}>Skor</p>
+                      <h4 className="text-3xl font-black italic uppercase tracking-tighter">{match.score}</h4>
+                    </div>
+                  </div>
+                </motion.div>
+              ))
+            ) : (
+              <div className={`col-span-full py-16 text-center rounded-[2rem] border-2 border-dashed ${isDark ? 'border-zinc-800 bg-zinc-900/20 text-zinc-600' : 'border-slate-100 bg-slate-50 text-slate-300'}`}>
+                <Swords size={32} className="mx-auto mb-4 opacity-20" />
+                <p className="text-xs font-black uppercase tracking-widest italic">Deretan musuh yang tumbang belum dicatat.</p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Activity Log */}
@@ -1137,6 +1292,216 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Member Detail Spotlight Modal */}
+      <AnimatePresence>
+        {selectedMember && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedMember(null)}
+              className="absolute inset-0 bg-black/95 backdrop-blur-3xl"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 100 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 100 }}
+              className={`relative w-full max-w-2xl rounded-[3.5rem] overflow-hidden border transition-all ${isDark ? 'bg-zinc-900 border-zinc-800 shadow-[0_0_100px_rgba(220,38,38,0.1)]' : 'bg-white border-slate-100 shadow-2xl shadow-slate-200'}`}
+            >
+              <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-red-600/20 to-transparent" />
+              
+              <button 
+                onClick={() => { setSelectedMember(null); playSound(440); }}
+                className="absolute top-8 right-8 z-20 p-4 rounded-3xl bg-black/50 text-white hover:bg-red-600 transition-colors backdrop-blur-md"
+              >
+                <X size={24} />
+              </button>
+
+              <div className="p-10 pt-16 relative z-10">
+                <div className="flex flex-col md:flex-row items-center gap-12 mb-12">
+                   <div className={`w-48 h-48 rounded-[3rem] overflow-hidden border-8 relative group ${isDark ? 'border-zinc-800' : 'border-slate-50'}`}>
+                      <div className="absolute inset-0 bg-red-600 flex items-center justify-center text-6xl font-black text-white italic">
+                         {selectedMember.avatarUrl ? (
+                           <img src={selectedMember.avatarUrl} className="w-full h-full object-cover" />
+                         ) : selectedMember.name.charAt(0)}
+                      </div>
+                      {selectedMember.role === 'Leader' && (
+                        <div className="absolute top-2 right-2 bg-yellow-500 p-2 rounded-xl shadow-xl">
+                          <ShieldCheck size={20} className="text-black" />
+                        </div>
+                      )}
+                   </div>
+                   
+                   <div className="text-center md:text-left flex-1">
+                      <div className="flex items-center justify-center md:justify-start gap-4 mb-2">
+                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                           selectedMember.role === 'Leader' ? 'bg-red-600 text-white' :
+                           selectedMember.role === 'Admin' ? 'bg-orange-600 text-white' :
+                           selectedMember.role === 'Pro Player' ? 'bg-indigo-600 text-white' :
+                           (isDark ? 'bg-zinc-800 text-zinc-500' : 'bg-slate-100 text-slate-400')
+                        }`}>
+                          {selectedMember.role}
+                        </span>
+                        {onlineUsers.includes(selectedMember.id) && (
+                          <div className="flex items-center gap-2 bg-green-600/20 text-green-500 px-3 py-1 rounded-full text-[9px] font-black uppercase">
+                            <Activity size={10} /> Online Now
+                          </div>
+                        )}
+                      </div>
+                      <h2 className={`text-6xl font-black italic uppercase tracking-tighter leading-none mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>{selectedMember.name}</h2>
+                      <p className={`text-sm font-bold uppercase tracking-widest ${isDark ? 'text-zinc-500' : 'text-slate-400'}`}>ID: MEMBER-{selectedMember.id.substr(0, 8)}</p>
+                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className={`p-8 rounded-[2.5rem] border ${isDark ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-50 border-slate-100'}`}>
+                    <div className="flex items-center gap-3 mb-6">
+                       <Crosshair size={18} className="text-red-500" />
+                       <h3 className="font-black italic uppercase tracking-tighter text-xl">Combat Stats</h3>
+                    </div>
+                    <div className="space-y-6">
+                      <div>
+                        <div className="flex justify-between mb-2">
+                          <span className="text-[10px] font-black text-zinc-500 uppercase">Skill Power</span>
+                          <span className="text-sm font-black italic">{selectedMember.skillLevel}%</span>
+                        </div>
+                        <div className="w-full h-3 bg-zinc-800 rounded-full overflow-hidden">
+                          <motion.div initial={{ width: 0 }} animate={{ width: `${selectedMember.skillLevel}%` }} className="h-full bg-red-600 shadow-[0_0_15px_rgba(220,38,38,0.5)]" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
+                        <div className="text-center">
+                          <p className="text-[10px] font-black text-zinc-500 uppercase mb-1">XP Contrib</p>
+                          <p className="text-3xl font-black italic">{Math.floor((selectedMember.skillLevel || 0) * 0.5)}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-[10px] font-black text-zinc-500 uppercase mb-1">Rank Info</p>
+                          <p className="text-2xl font-black italic text-red-500">#{activeCircle.members.sort((a,b) => (b.skillLevel || 0) - (a.skillLevel || 0)).findIndex(m => m.id === selectedMember.id) + 1}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={`p-8 rounded-[2.5rem] border ${isDark ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-50 border-slate-100'}`}>
+                    <div className="flex items-center gap-3 mb-6">
+                       <Trophy size={18} className="text-yellow-500" />
+                       <h3 className="font-black italic uppercase tracking-tighter text-xl">Achievements</h3>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedMember.achievements.length > 0 ? selectedMember.achievements.map((ach, idx) => (
+                        <div key={idx} className={`px-4 py-2 rounded-xl border flex items-center gap-2 group/ach cursor-default transition-all hover:-translate-y-1 ${isDark ? 'bg-zinc-900 border-zinc-800 hover:border-yellow-500/50' : 'bg-white border-slate-200 hover:border-yellow-200 shadow-sm'}`}>
+                           <Zap size={10} className="text-yellow-500" />
+                           <span className="text-[10px] font-bold uppercase tracking-tight">{ach}</span>
+                        </div>
+                      )) : (
+                        <div className="text-center py-8 w-full">
+                          <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest italic opacity-50">Belum ada medali.</p>
+                        </div>
+                      )}
+                    </div>
+                    {selectedMember.phone && (
+                       <div className="mt-8 pt-6 border-t border-white/5">
+                          <a 
+                            href={`https://wa.me/${selectedMember.phone}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-3 bg-green-600 hover:bg-green-700 text-white rounded-2xl py-4 font-black italic uppercase text-[10px] tracking-widest shadow-xl transition-all active:scale-95 shadow-green-950"
+                          >
+                            <MessageCircle size={14} /> Hubungi WhatsApp
+                          </a>
+                       </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Match Modal */}
+      <AnimatePresence>
+        {isAddingMatch && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsAddingMatch(false)}
+              className="absolute inset-0 bg-black/90 backdrop-blur-3xl"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8, y: 100 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 100 }}
+              className={`relative w-full max-w-lg rounded-[3rem] p-12 overflow-hidden border transition-colors ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-100 shadow-2xl'}`}
+            >
+              <div className="absolute top-0 left-0 w-full h-4 bg-red-600" />
+              
+              <div className="flex justify-between items-start mb-14">
+                <div className={isDark ? 'text-white' : 'text-slate-900'}>
+                  <h2 className="text-5xl font-black leading-none italic uppercase tracking-tighter">Match</h2>
+                  <h2 className="text-5xl font-black text-red-600 mt-2 leading-none italic uppercase tracking-tighter">Result</h2>
+                </div>
+                <button 
+                  onClick={() => setIsAddingMatch(false)} 
+                  className={`p-4 rounded-3xl transition-colors ${isDark ? 'hover:bg-zinc-800 text-zinc-600 hover:text-red-500' : 'hover:bg-slate-50 text-slate-300 hover:text-red-600'}`}
+                >
+                  <X size={36} />
+                </button>
+              </div>
+              
+              <div className="space-y-8">
+                <div className="flex gap-4 p-2 bg-zinc-950 rounded-[1.5rem] border border-white/5">
+                  <button 
+                    onClick={() => { setMatchResult('WIN'); playSound(880); }}
+                    className={`flex-1 py-4 rounded-xl font-black italic uppercase transition-all ${matchResult === 'WIN' ? 'bg-green-600 text-white shadow-xl shadow-green-600/20' : 'text-zinc-600'}`}
+                  >
+                    Victory
+                  </button>
+                  <button 
+                    onClick={() => { setMatchResult('LOSE'); playSound(440); }}
+                    className={`flex-1 py-4 rounded-xl font-black italic uppercase transition-all ${matchResult === 'LOSE' ? 'bg-red-600 text-white shadow-xl shadow-red-600/20' : 'text-zinc-600'}`}
+                  >
+                    Defeat
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ml-4 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Nama Clan Lawan</label>
+                  <input
+                    type="text"
+                    value={matchOpponent}
+                    onChange={(e) => setMatchOpponent(e.target.value)}
+                    placeholder="E.G. GENGSTER 99"
+                    className={`w-full border-4 rounded-[1.5rem] py-5 px-6 outline-none transition-all text-xl font-black italic uppercase ${isDark ? 'bg-zinc-950 border-zinc-950 focus:bg-black focus:border-red-600/30 text-white' : 'bg-slate-50 border-slate-50 focus:bg-white text-slate-900'}`}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ml-4 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Skor Akhir</label>
+                  <input
+                    type="text"
+                    value={matchScore}
+                    onChange={(e) => setMatchScore(e.target.value)}
+                    placeholder="E.G. 2 - 0"
+                    className={`w-full border-4 rounded-[1.5rem] py-5 px-6 outline-none transition-all text-xl font-black italic uppercase ${isDark ? 'bg-zinc-950 border-zinc-950 focus:bg-black focus:border-red-600/30 text-white' : 'bg-slate-50 border-slate-50 focus:bg-white text-slate-900'}`}
+                  />
+                </div>
+                
+                <button 
+                  onClick={addMatch}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white py-8 rounded-[1.5rem] font-black shadow-2xl transition-all active:scale-95 text-2xl tracking-tighter italic uppercase shadow-red-950"
+                >
+                  Simpan Pertandingan
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Add Moment Modal */}
       <AnimatePresence>
