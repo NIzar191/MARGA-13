@@ -23,7 +23,11 @@ import {
   Phone,
   Link as LinkIcon,
   ExternalLink,
-  MessageCircle
+  MessageCircle,
+  Trophy,
+  Zap,
+  Activity,
+  Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { io } from 'socket.io-client';
@@ -50,6 +54,10 @@ interface CircleData {
   members: Member[];
   whatsappGroupLink?: string;
   announcement?: string;
+  nextMabar?: number;
+  mabarLocation?: string;
+  activities?: { id: string; text: string; time: number }[];
+  socialLinks?: { type: string; url: string }[];
   createdAt: number;
 }
 
@@ -63,11 +71,16 @@ const DEFAULT_CIRCLE: CircleData = {
       name: 'Admin', 
       role: 'Leader', 
       skillLevel: 100, 
-      achievements: ['FOUNDER', 'ELITE'], 
+      achievements: ['FOUNDER', 'ELITE', 'MVP'], 
       addedAt: Date.now() 
     }
   ],
   announcement: 'Selamat datang di Circle By Zyy! Tetap solid dan hargai sesama member.',
+  nextMabar: Date.now() + 86400000, // Besok
+  mabarLocation: 'Custom Room / Ranked',
+  activities: [
+    { id: '1', text: 'Circle By Zyy resmi dibuat!', time: Date.now() - 86400000 }
+  ],
   createdAt: 1715000000000
 };
 
@@ -149,6 +162,45 @@ export default function App() {
     circles.find(c => c.id === activeCircleId) || circles[0], 
   [circles, activeCircleId]);
 
+  const stats = useMemo(() => {
+    const members = activeCircle.members;
+    if (members.length === 0) return { avgSkill: 0, powerLevel: 0, eliteCount: 0, level: 1, exp: 0, nextExp: 1000 };
+    
+    const totalSkill = members.reduce((acc, m) => acc + (m.skillLevel || 0), 0);
+    const avgSkill = Math.round(totalSkill / members.length);
+    const powerLevel = totalSkill;
+    const eliteCount = members.filter(m => (m.skillLevel || 0) > 80).length;
+    
+    // Level calculation: Every 500 power level is 1 level
+    const level = Math.floor(powerLevel / 500) + 1;
+    const exp = powerLevel % 500;
+    const nextExp = 500;
+    
+    return { avgSkill, powerLevel, eliteCount, level, exp, nextExp };
+  }, [activeCircle.members]);
+
+  const addActivity = (text: string) => {
+    setCircles(prev => prev.map(c => {
+      if (c.id === activeCircleId) {
+        const newActivity = { id: Math.random().toString(36).substr(2, 9), text, time: Date.now() };
+        return { 
+          ...c, 
+          activities: [newActivity, ...(c.activities || [])].slice(0, 10) 
+        };
+      }
+      return c;
+    }));
+  };
+
+  const getTimeRemaining = (targetDate: number) => {
+    const diff = targetDate - Date.now();
+    if (diff <= 0) return "SEDANG BERLANGSUNG";
+    
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}J ${mins}M LAGI`;
+  };
+
   const filteredMembers = useMemo(() => {
     let result = activeCircle.members.filter(m => 
       m.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -186,6 +238,7 @@ export default function App() {
 
     setCircles(prev => prev.map(c => {
       if (c.id === activeCircleId) {
+        addActivity(`${newMember.name} bergabung ke Circle!`);
         return { ...c, members: [...c.members, newMember] };
       }
       return c;
@@ -197,9 +250,11 @@ export default function App() {
   };
 
   const removeMember = (id: string) => {
+    const member = activeCircle.members.find(m => m.id === id);
     if (!confirm('Hapus teman ini?')) return;
     setCircles(prev => prev.map(c => {
       if (c.id === activeCircleId) {
+        if (member) addActivity(`${member.name} telah dikeluarkan.`);
         return { ...c, members: c.members.filter(m => m.id !== id) };
       }
       return c;
@@ -213,6 +268,7 @@ export default function App() {
     }
     setCircles(prev => prev.map(c => {
       if (c.id === activeCircleId) {
+        addActivity(`Nama Circle diganti: ${editingNameValue}`);
         return { ...c, name: editingNameValue.trim() };
       }
       return c;
@@ -225,6 +281,7 @@ export default function App() {
     
     setCircles(prev => prev.map(c => {
       if (c.id === activeCircleId) {
+        addActivity(`Update profil: ${editMemberNameValue}`);
         return {
           ...c,
           members: c.members.map(m => 
@@ -234,7 +291,8 @@ export default function App() {
               avatarUrl: editMemberAvatar,
               phone: editMemberPhone.trim(),
               skillLevel: editMemberSkill,
-              role: editMemberRole
+              role: editMemberRole,
+              achievements: memberToEdit.achievements
             } : m
           )
         };
@@ -532,54 +590,205 @@ export default function App() {
                 <p className={`text-xs font-mono uppercase px-4 py-2 rounded-full border ${isDark ? 'text-zinc-500 bg-zinc-900/50 border-zinc-800/50' : 'text-slate-400 bg-slate-100 border-slate-200'}`}>
                   EST. {new Date(activeCircle.createdAt).getFullYear()}
                 </p>
-                {!activeCircle.announcement && (
+                
+                {/* Social Shortcuts */}
+                <div className="flex items-center gap-2">
                   <button 
-                    onClick={() => { setAnnouncementValue(''); setIsEditingAnnouncement(true); }}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full border border-dashed text-xs font-black uppercase transition-all hover:bg-zinc-800 ${isDark ? 'border-zinc-800 text-zinc-600' : 'border-slate-200 text-slate-300'}`}
+                    onClick={() => {
+                      const type = prompt('Tipe Social (TikTok/Discord/YouTube):') as any;
+                      const url = prompt('URL Link:');
+                      if (type && url) {
+                        setCircles(prev => prev.map(c => c.id === activeCircleId ? { ...c, socialLinks: [...(c.socialLinks || []), { type, url }] } : c));
+                        addActivity(`Link ${type} ditambahkan!`);
+                      }
+                    }}
+                    className={`p-2 rounded-lg border border-dashed text-xs ${isDark ? 'border-zinc-800 text-zinc-600' : 'border-slate-200 text-slate-300'}`}
                   >
                     <Plus size={14} />
-                    Buat Pengumuman
                   </button>
+                  {activeCircle.socialLinks?.map((link, idx) => (
+                    <a 
+                      key={idx} 
+                      href={link.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase border transition-all hover:-translate-y-1 ${
+                        link.type === 'TikTok' ? 'bg-black text-white' :
+                        link.type === 'Discord' ? 'bg-indigo-600 text-white' :
+                        (isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-slate-100 text-slate-600')
+                      }`}
+                    >
+                      {link.type}
+                    </a>
+                  ))}
+                </div>
+
+                {!activeCircle.announcement && (
+                  <>
+                    <button 
+                      onClick={() => {
+                        const newLocation = prompt('Lokasi / Room Mabar:', activeCircle.mabarLocation || 'Custom Room');
+                        if (newLocation !== null) {
+                          setCircles(prev => prev.map(c => c.id === activeCircleId ? { ...c, mabarLocation: newLocation, nextMabar: Date.now() + 3600000 } : c));
+                        }
+                      }}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-full border border-dashed text-xs font-black uppercase transition-all hover:bg-zinc-800 ${isDark ? 'border-zinc-800 text-zinc-600' : 'border-slate-200 text-slate-300'}`}
+                    >
+                      <Clock size={14} />
+                      Reset Jadwal
+                    </button>
+                    <button 
+                      onClick={() => { setAnnouncementValue(''); setIsEditingAnnouncement(true); }}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-full border border-dashed text-xs font-black uppercase transition-all hover:bg-zinc-800 ${isDark ? 'border-zinc-800 text-zinc-600' : 'border-slate-200 text-slate-300'}`}
+                    >
+                      <Plus size={14} />
+                      Buat Pengumuman
+                    </button>
+                  </>
                 )}
               </div>
             </div>
           </div>
         </header>
 
-        {/* Announcement Section */}
-        {activeCircle.announcement && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`mb-12 p-8 rounded-[2.5rem] border relative overflow-hidden group/ann ${isDark ? 'bg-red-600/10 border-red-600/20 text-white' : 'bg-red-50 border-red-100 text-red-900'}`}
-          >
-            <div className="flex flex-col md:flex-row md:items-center gap-6 relative z-10">
-              <div className="bg-red-600 p-4 rounded-3xl text-white shadow-xl flex-shrink-0 w-14 h-14 flex items-center justify-center">
-                <MessageCircle size={24} />
+        {/* Announcement & Schedule Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+          {activeCircle.announcement && (
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`p-8 rounded-[2.5rem] border relative overflow-hidden group/ann ${isDark ? 'bg-red-600/10 border-red-600/20 text-white' : 'bg-red-50 border-red-100 text-red-900'}`}
+            >
+              <div className="flex items-center gap-6 relative z-10">
+                <div className="bg-red-600 p-4 rounded-3xl text-white shadow-xl flex-shrink-0 w-14 h-14 flex items-center justify-center">
+                  <MessageCircle size={24} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-black uppercase tracking-[0.4em] opacity-60 mb-2">Papan Pengumuman</p>
+                  <p className="font-bold italic uppercase tracking-tighter leading-tight text-xl md:text-2xl">{activeCircle.announcement}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => { setAnnouncementValue(activeCircle.announcement || ''); setIsEditingAnnouncement(true); }}
+                    className={`p-4 rounded-2xl transition-all md:opacity-0 group-hover/ann:opacity-100 ${isDark ? 'bg-zinc-950/50 hover:bg-red-600/20' : 'bg-white/50 hover:bg-red-100'}`}
+                  >
+                    <Edit2 size={18} />
+                  </button>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-black uppercase tracking-[0.4em] opacity-60 mb-2">Papan Pengumuman Circle</p>
-                <p className="font-bold italic uppercase tracking-tighter leading-tight text-xl md:text-2xl">{activeCircle.announcement}</p>
+              <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+                <MessageCircle size={150} className="rotate-12 translate-x-12 -translate-y-12" />
               </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => { setAnnouncementValue(activeCircle.announcement || ''); setIsEditingAnnouncement(true); }}
-                  className={`p-4 rounded-2xl transition-all md:opacity-0 group-hover/ann:opacity-100 ${isDark ? 'bg-zinc-950/50 hover:bg-red-600/20' : 'bg-white/50 hover:bg-red-100'}`}
-                >
-                  <Edit2 size={18} />
-                </button>
-                <button 
-                  onClick={() => { setCircles(prev => prev.map(c => c.id === activeCircleId ? { ...c, announcement: undefined } : c)) }}
-                  className={`p-4 rounded-2xl transition-all md:opacity-0 group-hover/ann:opacity-100 ${isDark ? 'bg-zinc-950/50 hover:bg-red-600/20' : 'bg-white/50 hover:bg-red-100'}`}
-                >
-                  <X size={18} />
-                </button>
+            </motion.div>
+          )}
+
+          {activeCircle.nextMabar && (
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`p-8 rounded-[2.5rem] border relative overflow-hidden group/mabar ${isDark ? 'bg-indigo-600/10 border-indigo-600/20 text-white' : 'bg-indigo-50 border-indigo-100 text-indigo-900'}`}
+            >
+              <div className="flex items-center gap-6 relative z-10">
+                <div className="bg-indigo-600 p-4 rounded-3xl text-white shadow-xl flex-shrink-0 w-14 h-14 flex items-center justify-center">
+                  <Clock size={24} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-black uppercase tracking-[0.4em] opacity-60 mb-2">Jadwal Mabar Terdekat</p>
+                  <div className="flex items-center gap-4">
+                    <p className="font-black italic uppercase tracking-tighter text-2xl md:text-3xl text-indigo-500">{getTimeRemaining(activeCircle.nextMabar)}</p>
+                    <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-tighter ${isDark ? 'bg-indigo-600/20 text-indigo-400' : 'bg-indigo-100 text-indigo-600'}`}>{activeCircle.mabarLocation}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+                <Zap size={150} className="rotate-12 translate-x-12 -translate-y-12" />
+              </div>
+            </motion.div>
+          )}
+        </div>
+
+        {/* Circle Power Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+          <div className={`p-6 rounded-[2rem] border ${isDark ? 'bg-zinc-900/50 border-zinc-800' : 'bg-white border-slate-100 shadow-sm'}`}>
+            <p className={`text-[9px] font-black uppercase tracking-widest mb-2 ${isDark ? 'text-zinc-600' : 'text-slate-400'}`}>Avg Skill</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-black italic tracking-tighter">{stats.avgSkill}%</span>
+              <Activity size={14} className="text-red-500" />
+            </div>
+          </div>
+          <div className={`p-6 rounded-[2rem] border ${isDark ? 'bg-zinc-900/50 border-zinc-800' : 'bg-white border-slate-100 shadow-sm'}`}>
+            <p className={`text-[9px] font-black uppercase tracking-widest mb-2 ${isDark ? 'text-zinc-600' : 'text-slate-400'}`}>Power Level</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-black italic tracking-tighter">{stats.powerLevel}</span>
+              <Zap size={14} className="text-orange-500" />
+            </div>
+          </div>
+          <div className={`p-6 rounded-[2rem] border ${isDark ? 'bg-zinc-900/50 border-zinc-800' : 'bg-white border-slate-100 shadow-sm'}`}>
+            <p className={`text-[9px] font-black uppercase tracking-widest mb-2 ${isDark ? 'text-zinc-600' : 'text-slate-400'}`}>Elite Players</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-black italic tracking-tighter">{stats.eliteCount}</span>
+              <Trophy size={14} className="text-yellow-500" />
+            </div>
+          </div>
+          <div className={`p-6 rounded-[2rem] border ${isDark ? 'bg-zinc-900/50 border-zinc-800' : 'bg-white border-slate-100 shadow-sm'}`}>
+            <p className={`text-[9px] font-black uppercase tracking-widest mb-2 ${isDark ? 'text-zinc-600' : 'text-slate-400'}`}>Circle Level</p>
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-between items-baseline">
+                <span className="text-3xl font-black italic tracking-tighter">LV. {stats.level}</span>
+                <span className="text-[10px] font-bold text-zinc-500 uppercase">{stats.exp}/{stats.nextExp} XP</span>
+              </div>
+              <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(stats.exp / stats.nextExp) * 100}%` }}
+                  className="h-full bg-red-600 shadow-[0_0_10px_rgba(220,38,38,0.5)]"
+                />
               </div>
             </div>
-            <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
-              <MessageCircle size={150} className="rotate-12 translate-x-12 -translate-y-12" />
+          </div>
+        </div>
+
+        {/* Top 3 Leaderboard Highlight */}
+        {activeCircle.members.length >= 3 && (
+          <div className="mb-12">
+            <h2 className={`text-[10px] font-black uppercase tracking-[0.5em] mb-6 ${isDark ? 'text-zinc-700' : 'text-slate-300'}`}>Leaderboard All-Time</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[...activeCircle.members].sort((a,b) => (b.skillLevel || 0) - (a.skillLevel || 0)).slice(0, 3).map((m, idx) => (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: idx * 0.1 }}
+                  key={`top-${m.id}`}
+                  className={`p-6 rounded-[2.5rem] border relative overflow-hidden flex flex-col items-center justify-center text-center ${
+                    idx === 0 ? 'bg-gradient-to-br from-yellow-500/20 to-transparent border-yellow-500/30' :
+                    idx === 1 ? 'bg-gradient-to-br from-zinc-400/10 to-transparent border-zinc-400/30' :
+                    'bg-gradient-to-br from-orange-600/10 to-transparent border-orange-600/30'
+                  }`}
+                >
+                  <div className="relative mb-4">
+                    {idx === 0 && <Trophy size={40} className="absolute -top-6 -right-6 text-yellow-500 rotate-12 drop-shadow-lg" />}
+                    {idx === 1 && <Trophy size={32} className="absolute -top-4 -right-4 text-zinc-400 rotate-12 opacity-50" />}
+                    {idx === 2 && <Trophy size={24} className="absolute -top-3 -right-3 text-orange-600 rotate-12 opacity-50" />}
+                    
+                    <div className={`w-24 h-24 rounded-3xl flex items-center justify-center text-3xl font-black italic shadow-2xl relative overflow-hidden bg-zinc-900 border-4 ${
+                      idx === 0 ? 'border-yellow-500 shadow-yellow-500/20' :
+                      idx === 1 ? 'border-zinc-400 shadow-zinc-400/10' :
+                      'border-orange-600 shadow-orange-600/10'
+                    }`}>
+                      {m.avatarUrl ? (
+                         <img src={m.avatarUrl} alt="" className="w-full h-full object-cover" />
+                      ) : m.name.charAt(0)}
+                    </div>
+                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-zinc-900 px-4 py-1 rounded-full border border-white/10 text-[10px] font-black italic">
+                      RANK {idx + 1}
+                    </div>
+                  </div>
+                  <h3 className="font-black text-xl italic uppercase tracking-tighter truncate w-full">{m.name}</h3>
+                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-1">{m.skillLevel}% SKILL POWER</p>
+                </motion.div>
+              ))}
             </div>
-          </motion.div>
+          </div>
         )}
 
         <div className="flex flex-col gap-8 mb-12">
@@ -631,7 +840,7 @@ export default function App() {
                 className={`p-8 rounded-[2rem] border shadow-sm hover:shadow-2xl transition-all group relative overflow-hidden backdrop-blur-sm ${isDark ? 'bg-zinc-900/40 border-zinc-800/50 hover:shadow-red-600/10 hover:-translate-y-2 hover:border-red-600/30' : 'bg-white border-slate-100 hover:shadow-slate-200 hover:-translate-y-2 hover:border-slate-200'}`}
               >
                 <div className="flex items-center gap-6 relative z-10">
-                  <div className={`w-20 h-20 flex-shrink-0 rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-2xl group-hover:rotate-12 transition-transform overflow-hidden ${isDark ? 'bg-gradient-to-br from-red-600 to-red-800 shadow-red-950' : 'bg-red-600 shadow-red-100'}`}>
+                  <div className={`w-20 h-20 flex-shrink-0 rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-2xl group-hover:rotate-12 transition-transform overflow-hidden relative ${isDark ? 'bg-gradient-to-br from-red-600 to-red-800 shadow-red-950' : 'bg-red-600 shadow-red-100'}`}>
                     {member.avatarUrl ? (
                       <img 
                         src={member.avatarUrl} 
@@ -642,9 +851,26 @@ export default function App() {
                     ) : (
                       member.name.charAt(0).toUpperCase()
                     )}
+                    {member.achievements.length > 0 && (
+                      <div className="absolute bottom-1 right-1 bg-yellow-500 rounded-full p-1 border-2 border-red-600 shadow-lg">
+                        <Trophy size={10} className="text-black" />
+                      </div>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className={`font-black text-2xl truncate transition-colors leading-tight italic uppercase ${isDark ? 'text-zinc-100 group-hover:text-red-500' : 'text-slate-800 group-hover:text-red-600'}`}>{member.name}</h3>
+                    
+                    {/* Achievements Badges */}
+                    {member.achievements.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1 mb-2">
+                        {member.achievements.map((ach, idx) => (
+                          <span key={idx} className={`text-[7px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded shadow-sm border ${isDark ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500' : 'bg-yellow-50 border-yellow-200 text-yellow-600'}`}>
+                            {ach}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-3 mt-1 underline-offset-4 decoration-2">
                       <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${
                         member.role === 'Leader' ? 'bg-red-600 text-white' :
@@ -745,6 +971,29 @@ export default function App() {
               </button>
             </motion.div>
           )}
+        </div>
+
+        {/* Activity Log */}
+        <div className="mb-20">
+          <div className="flex items-center gap-4 mb-8">
+            <Activity size={20} className="text-red-600" />
+            <h2 className={`text-xl font-black italic uppercase tracking-tighter ${isDark ? 'text-white' : 'text-slate-900'}`}>Aktivitas Circle</h2>
+          </div>
+          <div className={`space-y-4 p-8 rounded-[2.5rem] border ${isDark ? 'bg-zinc-900/50 border-zinc-800' : 'bg-slate-50 border-slate-100'}`}>
+            {activeCircle.activities?.length ? (
+              activeCircle.activities.map((activity) => (
+                <div key={activity.id} className="flex items-center justify-between gap-4 border-b border-white/5 pb-4 last:border-0 last:pb-0">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-2 h-2 rounded-full ${isDark ? 'bg-red-600/40' : 'bg-red-200'}`} />
+                    <p className={`text-sm font-bold uppercase italic tracking-tight ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>{activity.text}</p>
+                  </div>
+                  <span className="text-[10px] font-mono text-zinc-600">{new Date(activity.time).toLocaleTimeString()}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-center text-xs font-mono text-zinc-600 italic">Belum ada aktivitas tercatat.</p>
+            )}
+          </div>
         </div>
       </main>
 
@@ -973,6 +1222,33 @@ export default function App() {
                         {role}
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ml-4 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Pencapaian / Badges</label>
+                  <div className="flex flex-wrap gap-2">
+                    {(['ELITE', 'MVP', 'FOUNDER', 'MABAR KING', 'FAST HAND', 'SADBOY'].map(badge => (
+                      <button
+                        key={badge}
+                        onClick={() => {
+                          const current = memberToEdit?.achievements || [];
+                          const updated = current.includes(badge) 
+                            ? current.filter(b => b !== badge)
+                            : [...current, badge];
+                          
+                          setMemberToEdit(prev => prev ? { ...prev, achievements: updated } : null);
+                          // We need to update circles state too during final save, or sync this way:
+                          setCircles(prev => prev.map(c => c.id === activeCircleId ? {
+                            ...c,
+                            members: c.members.map(m => m.id === memberToEdit?.id ? { ...m, achievements: updated } : m)
+                          } : c));
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border ${memberToEdit?.achievements?.includes(badge) ? 'bg-yellow-500 border-yellow-500 text-black shadow-[0_0_10px_rgba(234,179,8,0.3)]' : (isDark ? 'bg-zinc-950 border-zinc-900 text-zinc-600' : 'bg-slate-50 border-slate-100 text-slate-400')}`}
+                      >
+                        {badge}
+                      </button>
+                    )))}
                   </div>
                 </div>
 
