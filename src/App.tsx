@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Users, 
   Search, 
@@ -16,15 +16,28 @@ import {
   Circle,
   Menu,
   Sun,
-  Moon
+  Moon,
+  Camera,
+  Image as ImageIcon,
+  MessageSquare,
+  Phone,
+  Link as LinkIcon,
+  ExternalLink,
+  MessageCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { io } from 'socket.io-client';
+
+// Initialize socket
+const socket = io();
 
 // --- Types ---
 interface Member {
   id: string;
   name: string;
   nickname?: string;
+  avatarUrl?: string;
+  phone?: string;
   addedAt: number;
 }
 
@@ -32,13 +45,14 @@ interface CircleData {
   id: string;
   name: string;
   members: Member[];
+  whatsappGroupLink?: string;
   createdAt: number;
 }
 
 // --- Initial Data ---
 const DEFAULT_CIRCLE: CircleData = {
-  id: 'marga-13',
-  name: 'MARGA 13',
+  id: 'by-zyy',
+  name: 'By Zyy',
   members: [
     { id: '1', name: 'Admin', addedAt: Date.now() }
   ],
@@ -58,15 +72,22 @@ export default function App() {
     return [DEFAULT_CIRCLE];
   });
   
-  const [activeCircleId, setActiveCircleId] = useState<string>(circles[0]?.id || 'marga-13');
+  const [activeCircleId, setActiveCircleId] = useState<string>(circles[0]?.id || 'by-zyy');
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [newMemberName, setNewMemberName] = useState('');
+  const [newMemberAvatar, setNewMemberAvatar] = useState<string | undefined>();
   const [isEditingCircleName, setIsEditingCircleName] = useState(false);
   const [editingNameValue, setEditingNameValue] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [memberToEdit, setMemberToEdit] = useState<Member | null>(null);
   const [editMemberNameValue, setEditMemberNameValue] = useState('');
+  const [editMemberAvatar, setEditMemberAvatar] = useState<string | undefined>();
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [newMemberPhone, setNewMemberPhone] = useState('');
+  const [editMemberPhone, setEditMemberPhone] = useState('');
+  const [isEditingWhatsApp, setIsEditingWhatsApp] = useState(false);
+  const [whatsappLinkValue, setWhatsappLinkValue] = useState('');
   const [isDark, setIsDark] = useState(() => {
     const saved = localStorage.getItem('theme_preference');
     return saved ? saved === 'dark' : true; // Default to dark as requested earlier
@@ -80,6 +101,26 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('theme_preference', isDark ? 'dark' : 'light');
   }, [isDark]);
+
+  // Real-time Presence
+  useEffect(() => {
+    // Generate or get a persistent "Current User ID" for this browser session
+    let myId = localStorage.getItem('my_user_id');
+    if (!myId) {
+      myId = Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('my_user_id', myId);
+    }
+
+    socket.emit('join-circle', { circleId: activeCircleId, userId: myId });
+
+    socket.on('presence-update', (users: string[]) => {
+      setOnlineUsers(users);
+    });
+
+    return () => {
+      socket.off('presence-update');
+    };
+  }, [activeCircleId]);
 
   const activeCircle = useMemo(() => 
     circles.find(c => c.id === activeCircleId) || circles[0], 
@@ -100,6 +141,8 @@ export default function App() {
     const newMember: Member = {
       id: Math.random().toString(36).substr(2, 9),
       name: newMemberName.trim(),
+      avatarUrl: newMemberAvatar,
+      phone: newMemberPhone.trim(),
       addedAt: Date.now()
     };
 
@@ -110,6 +153,8 @@ export default function App() {
       return c;
     }));
     setNewMemberName('');
+    setNewMemberAvatar(undefined);
+    setNewMemberPhone('');
     setIsAddingMember(false);
   };
 
@@ -145,7 +190,12 @@ export default function App() {
         return {
           ...c,
           members: c.members.map(m => 
-            m.id === memberToEdit.id ? { ...m, name: editMemberNameValue.trim() } : m
+            m.id === memberToEdit.id ? { 
+              ...m, 
+              name: editMemberNameValue.trim(),
+              avatarUrl: editMemberAvatar,
+              phone: editMemberPhone.trim()
+            } : m
           )
         };
       }
@@ -153,6 +203,18 @@ export default function App() {
     }));
     setMemberToEdit(null);
     setEditMemberNameValue('');
+    setEditMemberAvatar(undefined);
+    setEditMemberPhone('');
+  };
+
+  const updateWhatsAppLink = () => {
+    setCircles(prev => prev.map(c => {
+      if (c.id === activeCircleId) {
+        return { ...c, whatsappGroupLink: whatsappLinkValue.trim() };
+      }
+      return c;
+    }));
+    setIsEditingWhatsApp(false);
   };
 
   const createNewCircle = () => {
@@ -168,6 +230,25 @@ export default function App() {
     setActiveCircleId(newCircle.id);
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, isEdit: boolean) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert('File terlalu besar! Maksimal 2MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (isEdit) {
+          setEditMemberAvatar(reader.result as string);
+        } else {
+          setNewMemberAvatar(reader.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   return (
     <div className={`min-h-screen font-sans transition-colors duration-300 ${isDark ? 'bg-zinc-950 text-zinc-50 selection:bg-red-900/30' : 'bg-slate-50 text-slate-900 selection:bg-red-100'}`}>
       {/* Mobile Top Header */}
@@ -176,7 +257,7 @@ export default function App() {
           <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-red-600/20">
             <Users size={16} />
           </div>
-          <span className={`font-bold tracking-tight ${isDark ? 'text-zinc-100' : 'text-slate-800'}`}>MARGA 13</span>
+          <span className={`font-bold tracking-tight ${isDark ? 'text-zinc-100' : 'text-slate-800'}`}>By Zyy</span>
         </div>
         <div className="flex items-center gap-2">
           <button 
@@ -201,7 +282,7 @@ export default function App() {
             <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center text-white shadow-xl shadow-red-600/30">
               <Users size={20} />
             </div>
-            <span className={`font-black text-xl tracking-tighter italic ${isDark ? 'text-zinc-100' : 'text-slate-900'}`}>MARGA 13</span>
+            <span className={`font-black text-xl tracking-tighter italic ${isDark ? 'text-zinc-100' : 'text-slate-900'}`}>By Zyy</span>
           </div>
 
           <nav className="space-y-1">
@@ -340,11 +421,50 @@ export default function App() {
                   </button>
                 </div>
               )}
+
+              {/* WhatsApp Connection */}
+              <div className="mt-4 flex flex-wrap gap-4">
+                {activeCircle.whatsappGroupLink ? (
+                  <div className="flex items-center gap-2">
+                    <a 
+                      href={activeCircle.whatsappGroupLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`flex items-center gap-3 px-5 py-2.5 rounded-full border shadow-lg text-sm font-black transition-all hover:-translate-y-1 ${isDark ? 'bg-green-600/10 border-green-600/30 text-green-500 hover:shadow-green-600/10' : 'bg-green-50 border-green-100 text-green-600 hover:shadow-green-100'}`}
+                    >
+                      <MessageCircle size={18} />
+                      WhatsApp Group Terhubung
+                      <ExternalLink size={14} />
+                    </a>
+                    <button 
+                      onClick={() => { setIsEditingWhatsApp(true); setWhatsappLinkValue(activeCircle.whatsappGroupLink || ''); }}
+                      className={`p-2 rounded-full transition-colors ${isDark ? 'hover:bg-zinc-900 border-zinc-800' : 'hover:bg-white border-slate-200'} border`}
+                    >
+                      <Edit2 size={14} className={isDark ? 'text-zinc-600' : 'text-slate-400'} />
+                    </button>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={() => { setIsEditingWhatsApp(true); setWhatsappLinkValue(''); }}
+                    className={`flex items-center gap-3 px-5 py-2.5 rounded-full border border-dashed text-sm font-black transition-all hover:bg-green-600 hover:text-white hover:border-transparent ${isDark ? 'border-zinc-800 text-zinc-600' : 'border-slate-200 text-slate-300'}`}
+                  >
+                    <LinkIcon size={18} />
+                    Hubungkan Ke WhatsApp Group
+                  </button>
+                )}
+              </div>
+
               <div className="flex flex-wrap items-center gap-4 mt-6">
                 <p className={`font-black flex items-center gap-3 px-5 py-2.5 rounded-full border shadow-xl text-sm uppercase tracking-widest ${isDark ? 'text-zinc-200 bg-zinc-900 border-zinc-800' : 'text-slate-700 bg-white border-slate-100'}`}>
                   <Users size={16} className="text-red-500" />
                   {activeCircle.members.length} Peserta
                 </p>
+                {onlineUsers.length > 0 && (
+                  <div className={`flex items-center gap-3 px-5 py-2.5 rounded-full border shadow-xl text-sm font-black uppercase tracking-widest animate-pulse ${isDark ? 'bg-green-600/10 border-green-600/30 text-green-500' : 'bg-green-50 border-green-100 text-green-600'}`}>
+                    <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
+                    {onlineUsers.length} Online Sekarang
+                  </div>
+                )}
                 <p className={`text-xs font-mono uppercase px-4 py-2 rounded-full border ${isDark ? 'text-zinc-500 bg-zinc-900/50 border-zinc-800/50' : 'text-slate-400 bg-slate-100 border-slate-200'}`}>
                   EST. {new Date(activeCircle.createdAt).getFullYear()}
                 </p>
@@ -391,23 +511,45 @@ export default function App() {
                 className={`p-8 rounded-[2rem] border shadow-sm hover:shadow-2xl transition-all group relative overflow-hidden backdrop-blur-sm ${isDark ? 'bg-zinc-900/40 border-zinc-800/50 hover:shadow-red-600/10 hover:-translate-y-2 hover:border-red-600/30' : 'bg-white border-slate-100 hover:shadow-slate-200 hover:-translate-y-2 hover:border-slate-200'}`}
               >
                 <div className="flex items-center gap-6 relative z-10">
-                  <div className={`w-20 h-20 rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-2xl group-hover:rotate-12 transition-transform ${isDark ? 'bg-gradient-to-br from-red-600 to-red-800 shadow-red-950' : 'bg-red-600 shadow-red-100'}`}>
-                    {member.name.charAt(0).toUpperCase()}
+                  <div className={`w-20 h-20 flex-shrink-0 rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-2xl group-hover:rotate-12 transition-transform overflow-hidden ${isDark ? 'bg-gradient-to-br from-red-600 to-red-800 shadow-red-950' : 'bg-red-600 shadow-red-100'}`}>
+                    {member.avatarUrl ? (
+                      <img 
+                        src={member.avatarUrl} 
+                        alt={member.name} 
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      member.name.charAt(0).toUpperCase()
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className={`font-black text-2xl truncate transition-colors leading-tight italic uppercase ${isDark ? 'text-zinc-100 group-hover:text-red-500' : 'text-slate-800 group-hover:text-red-600'}`}>{member.name}</h3>
                     <div className="flex items-center gap-3 mt-2">
-                      <div className={`w-2 h-2 rounded-full ${isDark ? 'bg-red-600 shadow-[0_0_10px_rgba(220,38,38,0.8)]' : 'bg-red-500'}`} />
+                      <div className={`w-2 h-2 rounded-full ${onlineUsers.includes(member.id) ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.8)]' : (isDark ? 'bg-zinc-800' : 'bg-slate-200')}`} />
                       <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${isDark ? 'text-zinc-500' : 'text-slate-400'}`}>
-                        Verified Member
+                        {onlineUsers.includes(member.id) ? 'WhatsApp Online' : 'WhatsApp Offline'}
                       </p>
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
+                    {member.phone && (
+                      <a 
+                        href={`https://wa.me/${member.phone.replace(/[^0-9]/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`p-3 rounded-xl transition-all ${isDark ? 'text-zinc-600 hover:text-green-500 hover:bg-green-600/10' : 'text-slate-400 hover:text-green-600 hover:bg-green-50'}`}
+                        title="Chat di WhatsApp"
+                      >
+                        <MessageSquare size={20} />
+                      </a>
+                    )}
                     <button 
                       onClick={() => {
                         setMemberToEdit(member);
                         setEditMemberNameValue(member.name);
+                        setEditMemberAvatar(member.avatarUrl);
+                        setEditMemberPhone(member.phone || '');
                       }}
                       className={`p-3 rounded-xl transition-all md:opacity-0 md:group-hover:opacity-100 ${isDark ? 'text-zinc-600 hover:text-red-500 hover:bg-red-600/10' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'}`}
                       title="Edit"
@@ -463,7 +605,7 @@ export default function App() {
             {[1, 2, 3].map(i => <div key={i} className={`w-12 h-1 rounded-full group-hover:bg-red-600 transition-colors ${isDark ? 'bg-zinc-800' : 'bg-slate-100'}`} />)}
           </div>
           <p className={`font-black text-base tracking-[0.5em] uppercase italic ${isDark ? 'text-zinc-500' : 'text-slate-300'}`}>
-            MARGA <span className="text-red-600">13</span>
+            BY <span className="text-red-600">ZYY</span>
           </p>
           <div className="pt-4 space-y-2">
             <p className={`text-[10px] font-mono uppercase tracking-widest ${isDark ? 'text-zinc-700' : 'text-slate-300'}`}>
@@ -511,6 +653,33 @@ export default function App() {
               </div>
               
               <div className="space-y-10">
+                <div className="flex flex-col items-center gap-6">
+                  <div className={`relative w-32 h-32 rounded-[2rem] border-4 border-dashed flex items-center justify-center overflow-hidden transition-all group/avatar ${isDark ? 'border-zinc-800 bg-zinc-950 hover:border-red-600/30' : 'border-slate-100 bg-slate-50 hover:border-red-200'}`}>
+                    {newMemberAvatar ? (
+                      <>
+                        <img src={newMemberAvatar} className="w-full h-full object-cover" alt="Preview" />
+                        <button 
+                          onClick={() => setNewMemberAvatar(undefined)}
+                          className="absolute inset-0 bg-black/60 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center text-white"
+                        >
+                          <X size={24} />
+                        </button>
+                      </>
+                    ) : (
+                      <label className="cursor-pointer w-full h-full flex flex-col items-center justify-center gap-2 group/label">
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          accept="image/*" 
+                          onChange={(e) => handleImageUpload(e, false)} 
+                        />
+                        <Camera size={32} className={`transition-colors ${isDark ? 'text-zinc-700 group-hover/label:text-red-500' : 'text-slate-200 group-hover/label:text-red-500'}`} />
+                        <span className={`text-[9px] font-black uppercase tracking-widest ${isDark ? 'text-zinc-800' : 'text-slate-300'}`}>Upload Foto</span>
+                      </label>
+                    )}
+                  </div>
+                </div>
+
                 <div className="space-y-4">
                   <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ml-4 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Informasi Nama Teman</label>
                   <input
@@ -520,6 +689,17 @@ export default function App() {
                     onChange={(e) => setNewMemberName(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && addMember()}
                     placeholder="E.G. ANDREAS BLACK"
+                    className={`w-full border-4 rounded-[1.5rem] py-7 px-8 outline-none transition-all text-2xl font-black italic uppercase ${isDark ? 'bg-zinc-950 border-zinc-950 focus:bg-black focus:border-red-600/30 text-white placeholder:text-zinc-800' : 'bg-slate-50 border-slate-50 focus:bg-white focus:border-red-100 text-slate-900 placeholder:text-slate-200'}`}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ml-4 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Nomor WhatsApp</label>
+                  <input
+                    type="tel"
+                    value={newMemberPhone}
+                    onChange={(e) => setNewMemberPhone(e.target.value)}
+                    placeholder="E.G. 628123456789"
                     className={`w-full border-4 rounded-[1.5rem] py-7 px-8 outline-none transition-all text-2xl font-black italic uppercase ${isDark ? 'bg-zinc-950 border-zinc-950 focus:bg-black focus:border-red-600/30 text-white placeholder:text-zinc-800' : 'bg-slate-50 border-slate-50 focus:bg-white focus:border-red-100 text-slate-900 placeholder:text-slate-200'}`}
                   />
                 </div>
@@ -572,6 +752,33 @@ export default function App() {
               </div>
               
               <div className="space-y-10">
+                <div className="flex flex-col items-center gap-6">
+                  <div className={`relative w-32 h-32 rounded-[2rem] border-4 border-dashed flex items-center justify-center overflow-hidden transition-all group/avatar ${isDark ? 'border-zinc-800 bg-zinc-950 hover:border-red-600/30' : 'border-slate-100 bg-slate-50 hover:border-red-200'}`}>
+                    {editMemberAvatar || memberToEdit.avatarUrl ? (
+                      <>
+                        <img src={editMemberAvatar || memberToEdit.avatarUrl} className="w-full h-full object-cover" alt="Preview" />
+                        <button 
+                          onClick={() => setEditMemberAvatar('')}
+                          className="absolute inset-0 bg-black/60 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center text-white"
+                        >
+                          <X size={24} />
+                        </button>
+                      </>
+                    ) : (
+                      <label className="cursor-pointer w-full h-full flex flex-col items-center justify-center gap-2 group/label">
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          accept="image/*" 
+                          onChange={(e) => handleImageUpload(e, true)} 
+                        />
+                        <Camera size={32} className={`transition-colors ${isDark ? 'text-zinc-700 group-hover/label:text-red-500' : 'text-slate-200 group-hover/label:text-red-500'}`} />
+                        <span className={`text-[9px] font-black uppercase tracking-widest ${isDark ? 'text-zinc-800' : 'text-slate-300'}`}>Ubah Foto</span>
+                      </label>
+                    )}
+                  </div>
+                </div>
+
                 <div className="space-y-4">
                   <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ml-4 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Ubah Nama Terdaftar</label>
                   <input
@@ -584,6 +791,17 @@ export default function App() {
                     className={`w-full border-4 rounded-[2rem] py-7 px-8 outline-none transition-all text-2xl font-black italic uppercase ${isDark ? 'bg-zinc-950 border-zinc-950 focus:bg-black focus:border-red-600/30 text-white placeholder:text-zinc-800' : 'bg-slate-50 border-slate-50 focus:bg-white focus:border-red-100 text-slate-900 placeholder:text-slate-200'}`}
                   />
                 </div>
+
+                <div className="space-y-4">
+                  <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ml-4 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Nomor WhatsApp</label>
+                  <input
+                    type="tel"
+                    value={editMemberPhone}
+                    onChange={(e) => setEditMemberPhone(e.target.value)}
+                    placeholder="E.G. 628123456789"
+                    className={`w-full border-4 rounded-[1.5rem] py-7 px-8 outline-none transition-all text-2xl font-black italic uppercase ${isDark ? 'bg-zinc-950 border-zinc-950 focus:bg-black focus:border-red-600/30 text-white placeholder:text-zinc-800' : 'bg-slate-50 border-slate-50 focus:bg-white focus:border-red-100 text-slate-900 placeholder:text-slate-200'}`}
+                  />
+                </div>
                 
                 <button 
                   onClick={updateMember}
@@ -591,6 +809,66 @@ export default function App() {
                   className="w-full bg-red-600 hover:bg-red-700 text-white py-8 rounded-[2rem] font-black shadow-2xl disabled:opacity-20 transition-all active:scale-95 text-2xl tracking-tighter uppercase italic shadow-red-950"
                 >
                   Perbarui Identitas
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* WhatsApp Link Modal */}
+      <AnimatePresence>
+        {isEditingWhatsApp && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsEditingWhatsApp(false)}
+              className="absolute inset-0 bg-black/90 backdrop-blur-2xl"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8, y: 100 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 100 }}
+              transition={{ type: 'spring', damping: 25 }}
+              className={`relative w-full max-w-lg rounded-[3rem] p-12 overflow-hidden border transition-colors ${isDark ? 'bg-zinc-900 border-zinc-800 shadow-[0_0_100px_rgba(22,163,74,0.1)]' : 'bg-white border-slate-100 shadow-2xl'}`}
+            >
+              <div className="absolute top-0 left-0 w-full h-4 bg-gradient-to-r from-green-600 via-green-500 to-green-800" />
+              
+              <div className="flex justify-between items-start mb-14">
+                <div className={isDark ? 'text-white' : 'text-slate-900'}>
+                  <h2 className="text-5xl font-black leading-none italic uppercase tracking-tighter">Group</h2>
+                  <h2 className="text-5xl font-black text-green-600 mt-2 leading-none italic uppercase tracking-tighter">WhatsApp</h2>
+                  <div className={`h-2 w-20 mt-6 rounded-full ${isDark ? 'bg-green-600/30' : 'bg-green-100'}`} />
+                </div>
+                <button 
+                  onClick={() => setIsEditingWhatsApp(false)} 
+                  className={`p-4 rounded-3xl transition-colors ${isDark ? 'hover:bg-zinc-800 text-zinc-600 hover:text-green-500' : 'hover:bg-slate-50 text-slate-300 hover:text-green-600'}`}
+                >
+                  <X size={36} />
+                </button>
+              </div>
+              
+              <div className="space-y-10">
+                <div className="space-y-4">
+                  <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ml-4 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Link Invitasi Group</label>
+                  <input
+                    autoFocus
+                    type="url"
+                    value={whatsappLinkValue}
+                    onChange={(e) => setWhatsappLinkValue(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && updateWhatsAppLink()}
+                    placeholder="https://chat.whatsapp.com/..."
+                    className={`w-full border-4 rounded-[1.5rem] py-7 px-8 outline-none transition-all text-xl font-black italic ${isDark ? 'bg-zinc-950 border-zinc-950 focus:bg-black focus:border-green-600/30 text-white placeholder:text-zinc-800' : 'bg-slate-50 border-slate-50 focus:bg-white focus:border-green-100 text-slate-900 placeholder:text-slate-100'}`}
+                  />
+                </div>
+                
+                <button 
+                  onClick={updateWhatsAppLink}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white py-8 rounded-[1.5rem] font-black shadow-2xl transition-all active:scale-95 text-2xl tracking-tighter italic uppercase shadow-green-950"
+                >
+                  Simpan Link Group
                 </button>
               </div>
             </motion.div>
