@@ -39,6 +39,8 @@ interface Member {
   avatarUrl?: string;
   phone?: string;
   skillLevel?: number; // 0-100
+  role: 'Leader' | 'Admin' | 'Member' | 'Pro Player' | 'Beban';
+  achievements: string[];
   addedAt: number;
 }
 
@@ -47,6 +49,7 @@ interface CircleData {
   name: string;
   members: Member[];
   whatsappGroupLink?: string;
+  announcement?: string;
   createdAt: number;
 }
 
@@ -55,9 +58,17 @@ const DEFAULT_CIRCLE: CircleData = {
   id: 'by-zyy',
   name: 'By Zyy',
   members: [
-    { id: '1', name: 'Admin', addedAt: Date.now() }
+    { 
+      id: '1', 
+      name: 'Admin', 
+      role: 'Leader', 
+      skillLevel: 100, 
+      achievements: ['FOUNDER', 'ELITE'], 
+      addedAt: Date.now() 
+    }
   ],
-  createdAt: Date.now()
+  announcement: 'Selamat datang di Circle By Zyy! Tetap solid dan hargai sesama member.',
+  createdAt: 1715000000000
 };
 
 export default function App() {
@@ -86,12 +97,16 @@ export default function App() {
   const [editMemberNameValue, setEditMemberNameValue] = useState('');
   const [editMemberAvatar, setEditMemberAvatar] = useState<string | undefined>();
   const [editMemberSkill, setEditMemberSkill] = useState<number>(50);
+  const [editMemberRole, setEditMemberRole] = useState<Member['role']>('Member');
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [claimedMemberId, setClaimedMemberId] = useState<string | null>(() => localStorage.getItem(`claimed_id_${activeCircleId}`));
   const [isChoosingIdentity, setIsChoosingIdentity] = useState(false);
   const [newMemberPhone, setNewMemberPhone] = useState('');
+  const [newMemberRole, setNewMemberRole] = useState<Member['role']>('Member');
   const [editMemberPhone, setEditMemberPhone] = useState('');
   const [isEditingWhatsApp, setIsEditingWhatsApp] = useState(false);
+  const [isEditingAnnouncement, setIsEditingAnnouncement] = useState(false);
+  const [announcementValue, setAnnouncementValue] = useState('');
   const [whatsappLinkValue, setWhatsappLinkValue] = useState('');
   const [isDark, setIsDark] = useState(() => {
     const saved = localStorage.getItem('theme_preference');
@@ -135,12 +150,24 @@ export default function App() {
   [circles, activeCircleId]);
 
   const filteredMembers = useMemo(() => {
-    if (!activeCircle) return [];
-    return activeCircle.members.filter(m => 
+    let result = activeCircle.members.filter(m => 
       m.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      (m.nickname && m.nickname.toLowerCase().includes(searchQuery.toLowerCase()))
-    ).sort((a, b) => b.addedAt - a.addedAt);
-  }, [activeCircle, searchQuery]);
+      (m.role && m.role.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+    
+    // Sort: Online first, then Role priority, then Skill
+    return result.sort((a, b) => {
+      const aOnline = onlineUsers.includes(a.id);
+      const bOnline = onlineUsers.includes(b.id);
+      if (aOnline !== bOnline) return aOnline ? -1 : 1;
+      
+      const roleOrder: Record<string, number> = { 'Leader': 0, 'Admin': 1, 'Pro Player': 2, 'Member': 3, 'Beban': 4 };
+      if (roleOrder[a.role || 'Member'] !== roleOrder[b.role || 'Member']) 
+        return (roleOrder[a.role || 'Member'] ?? 3) - (roleOrder[b.role || 'Member'] ?? 3);
+      
+      return (b.skillLevel || 0) - (a.skillLevel || 0);
+    });
+  }, [activeCircle.members, searchQuery, onlineUsers]);
 
   // --- Handlers ---
   const toggleTheme = () => setIsDark(!isDark);
@@ -152,6 +179,8 @@ export default function App() {
       avatarUrl: newMemberAvatar,
       phone: newMemberPhone.trim(),
       skillLevel: newMemberSkill,
+      role: newMemberRole,
+      achievements: newMemberSkill > 80 ? ['ELITE'] : [],
       addedAt: Date.now()
     };
 
@@ -204,7 +233,8 @@ export default function App() {
               name: editMemberNameValue.trim(),
               avatarUrl: editMemberAvatar,
               phone: editMemberPhone.trim(),
-              skillLevel: editMemberSkill
+              skillLevel: editMemberSkill,
+              role: editMemberRole
             } : m
           )
         };
@@ -225,6 +255,16 @@ export default function App() {
       return c;
     }));
     setIsEditingWhatsApp(false);
+  };
+
+  const updateAnnouncement = () => {
+    setCircles(prev => prev.map(c => {
+      if (c.id === activeCircleId) {
+        return { ...c, announcement: announcementValue.trim() };
+      }
+      return c;
+    }));
+    setIsEditingAnnouncement(false);
   };
 
   const claimIdentity = (memberId: string) => {
@@ -492,6 +532,63 @@ export default function App() {
                 <p className={`text-xs font-mono uppercase px-4 py-2 rounded-full border ${isDark ? 'text-zinc-500 bg-zinc-900/50 border-zinc-800/50' : 'text-slate-400 bg-slate-100 border-slate-200'}`}>
                   EST. {new Date(activeCircle.createdAt).getFullYear()}
                 </p>
+                {!activeCircle.announcement && (
+                  <button 
+                    onClick={() => { setAnnouncementValue(''); setIsEditingAnnouncement(true); }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full border border-dashed text-xs font-black uppercase transition-all hover:bg-zinc-800 ${isDark ? 'border-zinc-800 text-zinc-600' : 'border-slate-200 text-slate-300'}`}
+                  >
+                    <Plus size={14} />
+                    Buat Pengumuman
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Announcement Section */}
+        {activeCircle.announcement && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`mb-12 p-8 rounded-[2.5rem] border relative overflow-hidden group/ann ${isDark ? 'bg-red-600/10 border-red-600/20 text-white' : 'bg-red-50 border-red-100 text-red-900'}`}
+          >
+            <div className="flex flex-col md:flex-row md:items-center gap-6 relative z-10">
+              <div className="bg-red-600 p-4 rounded-3xl text-white shadow-xl flex-shrink-0 w-14 h-14 flex items-center justify-center">
+                <MessageCircle size={24} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-black uppercase tracking-[0.4em] opacity-60 mb-2">Papan Pengumuman Circle</p>
+                <p className="font-bold italic uppercase tracking-tighter leading-tight text-xl md:text-2xl">{activeCircle.announcement}</p>
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => { setAnnouncementValue(activeCircle.announcement || ''); setIsEditingAnnouncement(true); }}
+                  className={`p-4 rounded-2xl transition-all md:opacity-0 group-hover/ann:opacity-100 ${isDark ? 'bg-zinc-950/50 hover:bg-red-600/20' : 'bg-white/50 hover:bg-red-100'}`}
+                >
+                  <Edit2 size={18} />
+                </button>
+                <button 
+                  onClick={() => { setCircles(prev => prev.map(c => c.id === activeCircleId ? { ...c, announcement: undefined } : c)) }}
+                  className={`p-4 rounded-2xl transition-all md:opacity-0 group-hover/ann:opacity-100 ${isDark ? 'bg-zinc-950/50 hover:bg-red-600/20' : 'bg-white/50 hover:bg-red-100'}`}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+              <MessageCircle size={150} className="rotate-12 translate-x-12 -translate-y-12" />
+            </div>
+          </motion.div>
+        )}
+
+        <div className="flex flex-col gap-8 mb-12">
+          <div className="flex justify-between items-end">
+            <div className="space-y-1">
+              <h2 className={`text-[10px] font-black uppercase tracking-[0.5em] ${isDark ? 'text-zinc-700' : 'text-slate-300'}`}>Circle Members</h2>
+              <div className="flex items-center gap-4">
+                <div className={`h-1 w-12 rounded-full ${isDark ? 'bg-red-900/30' : 'bg-red-100'}`} />
+                <p className={`text-3xl font-black italic uppercase tracking-tighter ${isDark ? 'text-white' : 'text-slate-900'}`}>Leaderboard</p>
               </div>
             </div>
 
@@ -506,20 +603,19 @@ export default function App() {
             </button>
           </div>
 
-          {/* Search Bar */}
           <div className="relative group">
             <div className={`absolute inset-y-0 left-0 pl-8 flex items-center pointer-events-none transition-colors ${isDark ? 'text-zinc-600 group-focus-within:text-red-500' : 'text-slate-300 group-focus-within:text-red-500'}`}>
               <Search size={28} />
             </div>
             <input
               type="text"
-              placeholder={`CARI NAMA DI ${activeCircle.name}...`}
+              placeholder={`CARI NAMA ATAU ROLE...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className={`w-full border-2 rounded-3xl py-7 pl-20 pr-10 shadow-2xl outline-none transition-all text-2xl font-black italic uppercase tracking-tighter ${isDark ? 'bg-zinc-900/50 border-zinc-800/50 focus:ring-8 focus:ring-red-600/5 focus:border-red-600/40 text-white placeholder:text-zinc-800' : 'bg-white border-slate-100 focus:ring-8 focus:ring-red-100 focus:border-red-200 text-slate-900 placeholder:text-slate-200'}`}
             />
           </div>
-        </header>
+        </div>
 
         {/* Member Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -549,6 +645,19 @@ export default function App() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className={`font-black text-2xl truncate transition-colors leading-tight italic uppercase ${isDark ? 'text-zinc-100 group-hover:text-red-500' : 'text-slate-800 group-hover:text-red-600'}`}>{member.name}</h3>
+                    <div className="flex items-center gap-3 mt-1 underline-offset-4 decoration-2">
+                      <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${
+                        member.role === 'Leader' ? 'bg-red-600 text-white' :
+                        member.role === 'Admin' ? 'bg-orange-600 text-white' :
+                        member.role === 'Pro Player' ? 'bg-indigo-600 text-white' :
+                        isDark ? 'bg-zinc-800 text-zinc-500' : 'bg-slate-100 text-slate-400'
+                      }`}>
+                        {member.role || 'Member'}
+                      </span>
+                      {member.skillLevel === 100 && (
+                        <span className="bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded-sm animate-bounce">TOP TIER</span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-3 mt-2">
                       <div className={`w-2 h-2 rounded-full ${onlineUsers.includes(member.id) ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]' : (isDark ? 'bg-zinc-800' : 'bg-slate-200')} ${claimedMemberId === member.id ? 'ring-2 ring-offset-2 ring-red-500 ring-offset-zinc-900' : ''}`} />
                       <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${onlineUsers.includes(member.id) ? 'text-green-500' : (isDark ? 'text-zinc-500' : 'text-slate-400')}`}>
@@ -746,6 +855,21 @@ export default function App() {
                 </div>
 
                 <div className="space-y-4">
+                  <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ml-4 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Jabatan / Role</label>
+                  <div className="flex flex-wrap gap-2">
+                    {(['Leader', 'Admin', 'Pro Player', 'Member', 'Beban'] as Member['role'][]).map(role => (
+                      <button
+                        key={role}
+                        onClick={() => setNewMemberRole(role)}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${newMemberRole === role ? 'bg-red-600 border-red-600 text-white' : (isDark ? 'bg-zinc-950 border-zinc-900 text-zinc-600 hover:border-red-600/30' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-red-100')}`}
+                      >
+                        {role}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
                   <div className="flex justify-between items-center ml-4">
                     <label className={`text-[11px] font-black uppercase tracking-[0.4em] ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Progres Skill: {newMemberSkill}%</label>
                     <span className={`text-[10px] font-bold italic uppercase ${newMemberSkill > 80 ? 'text-red-500' : (isDark ? 'text-zinc-600' : 'text-slate-300')}`}>
@@ -838,6 +962,21 @@ export default function App() {
                 </div>
 
                 <div className="space-y-4">
+                  <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ml-4 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Jabatan / Role</label>
+                  <div className="flex flex-wrap gap-2">
+                    {(['Leader', 'Admin', 'Pro Player', 'Member', 'Beban'] as Member['role'][]).map(role => (
+                      <button
+                        key={role}
+                        onClick={() => setEditMemberRole(role)}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${editMemberRole === role ? 'bg-red-600 border-red-600 text-white' : (isDark ? 'bg-zinc-950 border-zinc-900 text-zinc-600 hover:border-red-600/30' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-red-100')}`}
+                      >
+                        {role}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
                   <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ml-4 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Ubah Nama Terdaftar</label>
                   <input
                     autoFocus
@@ -859,6 +998,21 @@ export default function App() {
                     placeholder="E.G. 628123456789"
                     className={`w-full border-4 rounded-[1.5rem] py-7 px-8 outline-none transition-all text-2xl font-black italic uppercase ${isDark ? 'bg-zinc-950 border-zinc-950 focus:bg-black focus:border-red-600/30 text-white placeholder:text-zinc-800' : 'bg-slate-50 border-slate-50 focus:bg-white focus:border-red-100 text-slate-900 placeholder:text-slate-200'}`}
                   />
+                </div>
+
+                <div className="space-y-4">
+                  <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ml-4 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Jabatan / Role</label>
+                  <div className="flex flex-wrap gap-2">
+                    {(['Leader', 'Admin', 'Pro Player', 'Member', 'Beban'] as Member['role'][]).map(role => (
+                      <button
+                        key={role}
+                        onClick={() => setEditMemberRole(role)}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${editMemberRole === role ? 'bg-red-600 border-red-600 text-white' : (isDark ? 'bg-zinc-950 border-zinc-900 text-zinc-600 hover:border-red-600/30' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-red-100')}`}
+                      >
+                        {role}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="space-y-4">
@@ -884,6 +1038,65 @@ export default function App() {
                   className="w-full bg-red-600 hover:bg-red-700 text-white py-8 rounded-[2rem] font-black shadow-2xl disabled:opacity-20 transition-all active:scale-95 text-2xl tracking-tighter uppercase italic shadow-red-950"
                 >
                   Perbarui Identitas
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* WhatsApp Link Modal */}
+      {/* Announcement Editor Modal */}
+      <AnimatePresence>
+        {isEditingAnnouncement && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsEditingAnnouncement(false)}
+              className="absolute inset-0 bg-black/90 backdrop-blur-2xl"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8, y: 100 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 100 }}
+              className={`relative w-full max-w-lg rounded-[3rem] p-12 overflow-hidden border transition-colors ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-100 shadow-2xl'}`}
+            >
+              <div className="absolute top-0 left-0 w-full h-4 bg-red-600" />
+              
+              <div className="flex justify-between items-start mb-14">
+                <div className={isDark ? 'text-white' : 'text-slate-900'}>
+                  <h2 className="text-5xl font-black leading-none italic uppercase tracking-tighter">Papan</h2>
+                  <h2 className="text-5xl font-black text-red-600 mt-2 leading-none italic uppercase tracking-tighter">Info</h2>
+                  <div className={`h-2 w-20 mt-6 rounded-full ${isDark ? 'bg-red-600/30' : 'bg-red-100'}`} />
+                </div>
+                <button 
+                  onClick={() => setIsEditingAnnouncement(false)} 
+                  className={`p-4 rounded-3xl transition-colors ${isDark ? 'hover:bg-zinc-800 text-zinc-600 hover:text-red-500' : 'hover:bg-slate-50 text-slate-300 hover:text-red-600'}`}
+                >
+                  <X size={36} />
+                </button>
+              </div>
+              
+              <div className="space-y-10">
+                <div className="space-y-4">
+                  <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ml-4 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Teks Pengumuman</label>
+                  <textarea
+                    autoFocus
+                    rows={4}
+                    value={announcementValue}
+                    onChange={(e) => setAnnouncementValue(e.target.value)}
+                    placeholder="Contoh: Malam ini kita mabar jam 20:00! Stay tuned."
+                    className={`w-full border-4 rounded-[1.5rem] py-7 px-8 outline-none transition-all text-xl font-black italic ${isDark ? 'bg-zinc-950 border-zinc-950 focus:bg-black focus:border-red-600/30 text-white placeholder:text-zinc-800' : 'bg-slate-50 border-slate-50 focus:bg-white focus:border-red-100 text-slate-900 placeholder:text-slate-100'}`}
+                  />
+                </div>
+                
+                <button 
+                  onClick={updateAnnouncement}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white py-8 rounded-[1.5rem] font-black shadow-2xl transition-all active:scale-95 text-2xl tracking-tighter italic uppercase"
+                >
+                  Publikasi Pengumuman
                 </button>
               </div>
             </motion.div>
