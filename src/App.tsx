@@ -89,7 +89,21 @@ export default function App() {
     const saved = localStorage.getItem('circles_data');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (!Array.isArray(parsed) || parsed.length === 0) return [DEFAULT_CIRCLE];
+
+        // Migration: Ensure all members have the new required fields
+        return parsed.map((circle: any) => ({
+          ...circle,
+          members: (circle.members || []).map((m: any) => ({
+            ...m,
+            role: m.role || 'Member',
+            achievements: m.achievements || [],
+            skillLevel: m.skillLevel ?? 50
+          })),
+          activities: circle.activities || [],
+          socialLinks: circle.socialLinks || []
+        }));
       } catch (e) {
         return [DEFAULT_CIRCLE];
       }
