@@ -57,6 +57,7 @@ interface CircleData {
   nextMabar?: number;
   mabarLocation?: string;
   activities?: { id: string; text: string; time: number }[];
+  moments?: { id: string; url: string; caption?: string; time: number }[];
   socialLinks?: { type: string; url: string }[];
   createdAt: number;
 }
@@ -81,6 +82,7 @@ const DEFAULT_CIRCLE: CircleData = {
   activities: [
     { id: '1', text: 'Circle By Zyy resmi dibuat!', time: Date.now() - 86400000 }
   ],
+  moments: [],
   createdAt: 1715000000000
 };
 
@@ -102,6 +104,7 @@ export default function App() {
             skillLevel: m.skillLevel ?? 50
           })),
           activities: circle.activities || [],
+          moments: circle.moments || [],
           socialLinks: circle.socialLinks || []
         }));
       } catch (e) {
@@ -133,6 +136,9 @@ export default function App() {
   const [editMemberPhone, setEditMemberPhone] = useState('');
   const [isEditingWhatsApp, setIsEditingWhatsApp] = useState(false);
   const [isEditingAnnouncement, setIsEditingAnnouncement] = useState(false);
+  const [isAddingMoment, setIsAddingMoment] = useState(false);
+  const [momentCaption, setMomentCaption] = useState('');
+  const [momentImage, setMomentImage] = useState<string | undefined>();
   const [announcementValue, setAnnouncementValue] = useState('');
   const [whatsappLinkValue, setWhatsappLinkValue] = useState('');
   const [isDark, setIsDark] = useState(() => {
@@ -199,8 +205,38 @@ export default function App() {
         const newActivity = { id: Math.random().toString(36).substr(2, 9), text, time: Date.now() };
         return { 
           ...c, 
-          activities: [newActivity, ...(c.activities || [])].slice(0, 10) 
+          activities: [newActivity, ...(c.activities || [])].slice(0, 20) 
         };
+      }
+      return c;
+    }));
+  };
+
+  const addMoment = () => {
+    if (!momentImage) return;
+    const newMoment = {
+      id: Math.random().toString(36).substr(2, 9),
+      url: momentImage,
+      caption: momentCaption.trim(),
+      time: Date.now()
+    };
+    setCircles(prev => prev.map(c => {
+      if (c.id === activeCircleId) {
+        addActivity('Momen baru ditambahkan ke galeri!');
+        return { ...c, moments: [newMoment, ...(c.moments || [])] };
+      }
+      return c;
+    }));
+    setMomentImage(undefined);
+    setMomentCaption('');
+    setIsAddingMoment(false);
+  };
+
+  const removeMoment = (id: string) => {
+    if (!confirm('Hapus momen ini?')) return;
+    setCircles(prev => prev.map(c => {
+      if (c.id === activeCircleId) {
+        return { ...c, moments: (c.moments || []).filter(m => m.id !== id) };
       }
       return c;
     }));
@@ -372,6 +408,21 @@ export default function App() {
         } else {
           setNewMemberAvatar(reader.result as string);
         }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleMomentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File terlalu besar! Maksimal 5MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setMomentImage(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
@@ -765,6 +816,59 @@ export default function App() {
           </div>
         </div>
 
+        {/* Moment Gallery Section */}
+        <div className="mb-20">
+          <div className="flex justify-between items-center mb-8">
+            <div className="flex items-center gap-4">
+              <ImageIcon size={20} className="text-red-600" />
+              <h2 className={`text-xl font-black italic uppercase tracking-tighter ${isDark ? 'text-white' : 'text-slate-900'}`}>Momen Seru (Gallery)</h2>
+            </div>
+            <button 
+              onClick={() => setIsAddingMoment(true)}
+              className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${isDark ? 'bg-red-600/10 text-red-500 border border-red-600/20 hover:bg-red-600/20' : 'bg-red-50 text-red-600 border border-red-100 hover:bg-red-100'}`}
+            >
+              <Camera size={14} />
+              Tambah Momen
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <AnimatePresence mode="popLayout">
+              {activeCircle.moments?.length ? (
+                activeCircle.moments.map((moment) => (
+                  <motion.div
+                    layout
+                    key={moment.id}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    className="group relative aspect-[4/5] rounded-[2rem] overflow-hidden border border-white/5 bg-zinc-900"
+                  >
+                    <img src={moment.url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-6">
+                      <p className="text-white text-[10px] font-bold italic tracking-tighter uppercase mb-3">{moment.caption || 'Tanpa Caption'}</p>
+                      <div className="flex justify-between items-center">
+                        <span className="text-zinc-500 text-[8px] font-mono">{new Date(moment.time).toLocaleDateString()}</span>
+                        <button 
+                          onClick={() => removeMoment(moment.id)}
+                          className="p-2 bg-red-600/20 text-red-500 rounded-lg hover:bg-red-600 hover:text-white transition-colors"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))
+              ) : (
+                <div className={`col-span-full py-16 text-center rounded-[2rem] border-2 border-dashed ${isDark ? 'border-zinc-800 bg-zinc-900/20 text-zinc-600' : 'border-slate-100 bg-slate-50 text-slate-300'}`}>
+                  <ImageIcon size={32} className="mx-auto mb-4 opacity-20" />
+                  <p className="text-xs font-black uppercase tracking-widest italic">Belum ada foto kemenangan.</p>
+                </div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
         {/* Top 3 Leaderboard Highlight */}
         {activeCircle.members.length >= 3 && (
           <div className="mb-12">
@@ -1033,6 +1137,95 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Add Moment Modal */}
+      <AnimatePresence>
+        {isAddingMoment && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsAddingMoment(false)}
+              className="absolute inset-0 bg-black/90 backdrop-blur-2xl"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8, y: 100 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 100 }}
+              className={`relative w-full max-w-lg rounded-[3rem] p-12 overflow-hidden border transition-colors ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-100 shadow-2xl'}`}
+            >
+              <div className="absolute top-0 left-0 w-full h-4 bg-red-600" />
+              
+              <div className="flex justify-between items-start mb-14">
+                <div className={isDark ? 'text-white' : 'text-slate-900'}>
+                  <h2 className="text-5xl font-black leading-none italic uppercase tracking-tighter">Upload</h2>
+                  <h2 className="text-5xl font-black text-red-600 mt-2 leading-none italic uppercase tracking-tighter">Momen</h2>
+                  <div className={`h-2 w-20 mt-6 rounded-full ${isDark ? 'bg-red-600/30' : 'bg-red-100'}`} />
+                </div>
+                <button 
+                  onClick={() => setIsAddingMoment(false)} 
+                  className={`p-4 rounded-3xl transition-colors ${isDark ? 'hover:bg-zinc-800 text-zinc-600 hover:text-red-500' : 'hover:bg-slate-50 text-slate-300 hover:text-red-600'}`}
+                >
+                  <X size={36} />
+                </button>
+              </div>
+              
+              <div className="space-y-10">
+                <div className="flex flex-col items-center gap-6">
+                  <div className={`relative w-full aspect-video rounded-[2rem] border-4 border-dashed flex items-center justify-center overflow-hidden transition-all group/moment ${isDark ? 'border-zinc-800 bg-zinc-950 hover:border-red-600/30' : 'border-slate-100 bg-slate-50 hover:border-red-200'}`}>
+                    {momentImage ? (
+                      <>
+                        <img src={momentImage} className="w-full h-full object-cover" alt="Preview" />
+                        <button 
+                          onClick={() => setMomentImage(undefined)}
+                          className="absolute inset-0 bg-black/60 opacity-0 group-hover/moment:opacity-100 transition-opacity flex items-center justify-center text-white"
+                        >
+                          <X size={24} />
+                        </button>
+                      </>
+                    ) : (
+                      <label className="cursor-pointer w-full h-full flex flex-col items-center justify-center gap-4 group/label">
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          accept="image/*" 
+                          onChange={handleMomentUpload} 
+                        />
+                        <Camera size={48} className={`transition-colors ${isDark ? 'text-zinc-700 group-hover/label:text-red-500' : 'text-slate-200 group-hover/label:text-red-500'}`} />
+                        <div className="text-center">
+                          <span className={`block font-black uppercase tracking-widest text-sm ${isDark ? 'text-zinc-500' : 'text-slate-400'}`}>Klik Untuk Upload</span>
+                          <span className={`text-[10px] mt-1 font-bold ${isDark ? 'text-zinc-700' : 'text-slate-300'}`}>Screenshot Kemenangan / Foto Seru</span>
+                        </div>
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ml-4 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Caption Momen</label>
+                  <input
+                    autoFocus
+                    type="text"
+                    value={momentCaption}
+                    onChange={(e) => setMomentCaption(e.target.value)}
+                    placeholder="E.G. WIN STREAK HARI INI!"
+                    className={`w-full border-4 rounded-[1.5rem] py-7 px-8 outline-none transition-all text-xl font-black italic uppercase ${isDark ? 'bg-zinc-950 border-zinc-950 focus:bg-black focus:border-red-600/30 text-white placeholder:text-zinc-800' : 'bg-slate-50 border-slate-50 focus:bg-white focus:border-red-100 text-slate-900 placeholder:text-slate-200'}`}
+                  />
+                </div>
+                
+                <button 
+                  onClick={addMoment}
+                  disabled={!momentImage}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white py-8 rounded-[1.5rem] font-black shadow-2xl disabled:opacity-20 transition-all active:scale-95 text-2xl tracking-tighter italic uppercase shadow-red-950"
+                >
+                  Publish Ke Gallery
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Add Member Modal */}
       <AnimatePresence>
