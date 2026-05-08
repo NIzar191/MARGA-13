@@ -87,6 +87,8 @@ export default function App() {
   const [editMemberAvatar, setEditMemberAvatar] = useState<string | undefined>();
   const [editMemberSkill, setEditMemberSkill] = useState<number>(50);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [claimedMemberId, setClaimedMemberId] = useState<string | null>(() => localStorage.getItem(`claimed_id_${activeCircleId}`));
+  const [isChoosingIdentity, setIsChoosingIdentity] = useState(false);
   const [newMemberPhone, setNewMemberPhone] = useState('');
   const [editMemberPhone, setEditMemberPhone] = useState('');
   const [isEditingWhatsApp, setIsEditingWhatsApp] = useState(false);
@@ -107,22 +109,25 @@ export default function App() {
 
   // Real-time Presence
   useEffect(() => {
-    // Generate or get a persistent "Current User ID" for this browser session
-    let myId = localStorage.getItem('my_user_id');
-    if (!myId) {
-      myId = Math.random().toString(36).substr(2, 9);
-      localStorage.setItem('my_user_id', myId);
+    if (claimedMemberId) {
+      socket.emit('join-circle', { circleId: activeCircleId, userId: claimedMemberId });
     }
 
-    socket.emit('join-circle', { circleId: activeCircleId, userId: myId });
-
-    socket.on('presence-update', (users: string[]) => {
+    const handlePresence = (users: string[]) => {
       setOnlineUsers(users);
-    });
+    };
+
+    socket.on('presence-update', handlePresence);
 
     return () => {
-      socket.off('presence-update');
+      socket.off('presence-update', handlePresence);
     };
+  }, [activeCircleId, claimedMemberId]);
+
+  // Update claimed ID when circle changes
+  useEffect(() => {
+    const saved = localStorage.getItem(`claimed_id_${activeCircleId}`);
+    setClaimedMemberId(saved);
   }, [activeCircleId]);
 
   const activeCircle = useMemo(() => 
@@ -220,6 +225,12 @@ export default function App() {
       return c;
     }));
     setIsEditingWhatsApp(false);
+  };
+
+  const claimIdentity = (memberId: string) => {
+    setClaimedMemberId(memberId);
+    localStorage.setItem(`claimed_id_${activeCircleId}`, memberId);
+    setIsChoosingIdentity(false);
   };
 
   const createNewCircle = () => {
@@ -457,6 +468,14 @@ export default function App() {
                     Hubungkan Ke WhatsApp Group
                   </button>
                 )}
+
+                <button 
+                  onClick={() => setIsChoosingIdentity(true)}
+                  className={`flex items-center gap-3 px-5 py-2.5 rounded-full border shadow-lg text-sm font-black transition-all hover:-translate-y-1 ${claimedMemberId ? (isDark ? 'bg-zinc-900 border-zinc-800 text-zinc-300' : 'bg-white border-slate-200 text-slate-600') : (isDark ? 'bg-red-600/10 border-red-600/30 text-red-500' : 'bg-red-50 border-red-100 text-red-600')}`}
+                >
+                  <Circle size={14} className={claimedMemberId ? 'text-zinc-500' : 'fill-red-500 animate-pulse'} />
+                  {claimedMemberId ? `Login Sebagai: ${activeCircle.members.find(m => m.id === claimedMemberId)?.name || 'Guest'}` : 'Pilih Identitas Anda'}
+                </button>
               </div>
 
               <div className="flex flex-wrap items-center gap-4 mt-6">
@@ -467,7 +486,7 @@ export default function App() {
                 {onlineUsers.length > 0 && (
                   <div className={`flex items-center gap-3 px-5 py-2.5 rounded-full border shadow-xl text-sm font-black uppercase tracking-widest animate-pulse ${isDark ? 'bg-green-600/10 border-green-600/30 text-green-500' : 'bg-green-50 border-green-100 text-green-600'}`}>
                     <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
-                    {onlineUsers.length} Online Sekarang
+                    {onlineUsers.length} ONLINE DI GROUP
                   </div>
                 )}
                 <p className={`text-xs font-mono uppercase px-4 py-2 rounded-full border ${isDark ? 'text-zinc-500 bg-zinc-900/50 border-zinc-800/50' : 'text-slate-400 bg-slate-100 border-slate-200'}`}>
@@ -531,9 +550,9 @@ export default function App() {
                   <div className="flex-1 min-w-0">
                     <h3 className={`font-black text-2xl truncate transition-colors leading-tight italic uppercase ${isDark ? 'text-zinc-100 group-hover:text-red-500' : 'text-slate-800 group-hover:text-red-600'}`}>{member.name}</h3>
                     <div className="flex items-center gap-3 mt-2">
-                      <div className={`w-2 h-2 rounded-full ${onlineUsers.includes(member.id) ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.8)]' : (isDark ? 'bg-zinc-800' : 'bg-slate-200')}`} />
-                      <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${isDark ? 'text-zinc-500' : 'text-slate-400'}`}>
-                        {onlineUsers.includes(member.id) ? 'WhatsApp Online' : 'WhatsApp Offline'}
+                      <div className={`w-2 h-2 rounded-full ${onlineUsers.includes(member.id) ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]' : (isDark ? 'bg-zinc-800' : 'bg-slate-200')} ${claimedMemberId === member.id ? 'ring-2 ring-offset-2 ring-red-500 ring-offset-zinc-900' : ''}`} />
+                      <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${onlineUsers.includes(member.id) ? 'text-green-500' : (isDark ? 'text-zinc-500' : 'text-slate-400')}`}>
+                        {onlineUsers.includes(member.id) ? (claimedMemberId === member.id ? 'ANDA ONLINE' : 'WA ONLINE') : 'WA OFFLINE'}
                       </p>
                     </div>
                     {/* Skill Progress */}
@@ -925,6 +944,66 @@ export default function App() {
                   className="w-full bg-green-600 hover:bg-green-700 text-white py-8 rounded-[1.5rem] font-black shadow-2xl transition-all active:scale-95 text-2xl tracking-tighter italic uppercase shadow-green-950"
                 >
                   Simpan Link Group
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Identity Selection Modal */}
+      <AnimatePresence>
+        {isChoosingIdentity && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsChoosingIdentity(false)}
+              className="absolute inset-0 bg-black/95 backdrop-blur-3xl"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 50 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 50 }}
+              className={`relative w-full max-w-2xl rounded-[3rem] p-12 overflow-hidden border ${isDark ? 'bg-zinc-900 border-zinc-800 shadow-2xl shadow-red-600/10' : 'bg-white border-slate-100 shadow-2xl'}`}
+            >
+              <div className="absolute top-0 left-0 w-full h-2 bg-red-600" />
+              
+              <div className="flex justify-between items-start mb-10">
+                <div className={isDark ? 'text-white' : 'text-slate-900'}>
+                  <h2 className="text-4xl font-black leading-none italic uppercase tracking-tighter">Siapa</h2>
+                  <h2 className="text-4xl font-black text-red-600 mt-1 leading-none italic uppercase tracking-tighter">Anda?</h2>
+                  <p className={`text-xs mt-4 font-bold uppercase tracking-widest ${isDark ? 'text-zinc-600' : 'text-slate-400'}`}>Pilih nama Anda untuk mengaktifkan status online</p>
+                </div>
+                <button onClick={() => setIsChoosingIdentity(false)} className={`p-4 rounded-3xl ${isDark ? 'text-zinc-600 hover:text-red-500' : 'text-slate-300 hover:text-red-600'}`}>
+                  <X size={32} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+                {activeCircle.members.map(member => (
+                  <button
+                    key={member.id}
+                    onClick={() => claimIdentity(member.id)}
+                    className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 group/id ${claimedMemberId === member.id ? 'border-red-600 bg-red-600/10' : (isDark ? 'border-zinc-800 hover:border-red-600/30 bg-zinc-950' : 'border-slate-50 hover:border-red-100 bg-slate-50')}`}
+                  >
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-black text-lg overflow-hidden ${isDark ? 'bg-zinc-800' : 'bg-slate-200'}`}>
+                      {member.avatarUrl ? <img src={member.avatarUrl} className="w-full h-full object-cover" alt="" /> : member.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span className={`font-black text-[10px] uppercase tracking-widest truncate w-full text-center ${claimedMemberId === member.id ? 'text-red-500' : (isDark ? 'text-zinc-400 group-hover/id:text-zinc-200' : 'text-slate-600 group-hover/id:text-red-600')}`}>
+                      {member.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              
+              <div className="mt-10 flex gap-4">
+                <button 
+                  onClick={() => claimIdentity('')}
+                  className={`flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${isDark ? 'bg-zinc-800 text-zinc-500 hover:bg-zinc-700' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                >
+                  Masuk sebagai Guest
                 </button>
               </div>
             </motion.div>
