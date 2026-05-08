@@ -40,7 +40,17 @@ import {
   CheckCircle2,
   BarChart3,
   Flame,
-  Award
+  Award,
+  Bell,
+  Calendar,
+  Sparkles,
+  Palette,
+  Timer,
+  Dices,
+  Music,
+  Play,
+  Pause,
+  Volume1
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -72,6 +82,14 @@ interface Member {
   addedAt: number;
 }
 
+interface ScheduleItem {
+  id: string;
+  title: string;
+  date: number;
+  location: string;
+  type: 'Tournament' | 'Mabar' | 'Sparing';
+}
+
 interface PollOption {
   id: string;
   text: string;
@@ -99,6 +117,7 @@ interface CircleData {
   moments?: { id: string; url: string; caption?: string; time: number }[];
   matches?: { id: string; opponent: string; score: string; result: 'WIN' | 'LOSE'; date: number }[];
   polls?: Poll[];
+  schedule?: ScheduleItem[];
   socialLinks?: { type: string; url: string }[];
   createdAt: number;
 }
@@ -148,6 +167,7 @@ export default function App() {
           moments: circle.moments || [],
           matches: circle.matches || [],
           polls: circle.polls || [],
+          schedule: circle.schedule || [],
           socialLinks: circle.socialLinks || []
         }));
       } catch (e) {
@@ -193,6 +213,26 @@ export default function App() {
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['', '']);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [notifications, setNotifications] = useState<{ id: string; text: string; type: 'success' | 'error' | 'info' }[]>([]);
+  const [theme, setTheme] = useState<'classic' | 'neon' | 'minimal'>(() => (localStorage.getItem('theme_accent') as any) || 'classic');
+  const [isAddingSchedule, setIsAddingSchedule] = useState(false);
+  const [isShowingSplitter, setIsShowingSplitter] = useState(false);
+  const [splitterMembers, setSplitterMembers] = useState<string[]>([]);
+  const [splitTeams, setSplitTeams] = useState<{ teamA: Member[], teamB: Member[] } | null>(null);
+  const [isPlayingBGM, setIsPlayingBGM] = useState(false);
+  const [bgmVolume, setBgmVolume] = useState(0.3);
+  const [scheduleTitle, setScheduleTitle] = useState('');
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleType, setScheduleType] = useState<ScheduleItem['type']>('Mabar');
+  const [scheduleLocation, setScheduleLocation] = useState('');
+
+  const addNotification = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const id = Math.random().toString(36).substr(2, 9);
+    setNotifications(prev => [...prev, { id, text, type }]);
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 4000);
+  };
   const [isDark, setIsDark] = useState(() => {
     const saved = localStorage.getItem('theme_preference');
     return saved ? saved === 'dark' : true; // Default to dark as requested earlier
@@ -232,7 +272,8 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('theme_preference', isDark ? 'dark' : 'light');
-  }, [isDark]);
+    localStorage.setItem('theme_accent', theme);
+  }, [isDark, theme]);
 
   // Real-time Presence
   useEffect(() => {
@@ -448,6 +489,74 @@ export default function App() {
       return c;
     }));
     playSound(330);
+    addNotification('Voting dihapus', 'info');
+  };
+
+  const addSchedule = () => {
+    if (!scheduleTitle || !scheduleDate) return;
+    const newItem: ScheduleItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      title: scheduleTitle.toUpperCase(),
+      date: new Date(scheduleDate).getTime(),
+      type: scheduleType,
+      location: scheduleLocation || 'Custom Room'
+    };
+    setCircles(prev => prev.map(c => {
+      if (c.id === activeCircleId) {
+        addActivity(`AGENDA BARU: ${newItem.title}`);
+        return { ...c, schedule: [newItem, ...(c.schedule || [])].sort((a,b) => a.date - b.date) };
+      }
+      return c;
+    }));
+    playSound(880);
+    addNotification('Agenda berhasil ditambah!');
+    setIsAddingSchedule(false);
+    setScheduleTitle('');
+    setScheduleDate('');
+  };
+
+  const removeSchedule = (id: string) => {
+    setCircles(prev => prev.map(c => {
+      if (c.id === activeCircleId) {
+        return { ...c, schedule: (c.schedule || []).filter(s => s.id !== id) };
+      }
+      return c;
+    }));
+    addNotification('Agenda dihapus', 'info');
+  };
+
+  const toggleAchievement = (memberId: string, ach: string) => {
+    const isLeader = activeCircle.members.find(m => m.id === claimedMemberId)?.role === 'Leader';
+    if (!isLeader && claimedMemberId !== activeCircle.members.find(m => m.role === 'Leader')?.id) {
+       addNotification('Hanya Leader yang bisa kelola medali!', 'error');
+       return;
+    }
+
+    setCircles(prev => prev.map(c => {
+      if (c.id === activeCircleId) {
+        return {
+          ...c,
+          members: c.members.map(m => {
+            if (m.id === memberId) {
+              const has = m.achievements.includes(ach);
+              const newAchs = has ? m.achievements.filter(a => a !== ach) : [...m.achievements, ach];
+              if (selectedMember && selectedMember.id === memberId) {
+                setSelectedMember({ ...m, achievements: newAchs });
+              }
+              return { ...m, achievements: newAchs };
+            }
+            return m;
+          })
+        };
+      }
+      return c;
+    }));
+    playSound(hasAchievement(memberId, ach) ? 440 : 880);
+  };
+
+  const hasAchievement = (memberId: string, ach: string) => {
+    const member = activeCircle.members.find(m => m.id === memberId);
+    return member?.achievements.includes(ach) || false;
   };
 
   const getTimeRemaining = (targetDate: number) => {
@@ -502,6 +611,7 @@ export default function App() {
       return c;
     }));
     playSound(880, 'sine', 0.2);
+    addNotification(`${newMember.name} join Circle!`, 'success');
     setNewMemberName('');
     setNewMemberAvatar(undefined);
     setNewMemberPhone('');
@@ -519,6 +629,37 @@ export default function App() {
       return c;
     }));
     playSound(330, 'sawtooth', 0.1);
+  };
+  
+  const generateTeams = () => {
+    if (splitterMembers.length < 2) {
+      addNotification('Pilih minimal 2 orang untuk bagi tim!', 'error');
+      return;
+    }
+    
+    // Get member objects
+    const selected = activeCircle.members.filter(m => splitterMembers.includes(m.id));
+    
+    // Sort by skill to balance
+    const sorted = [...selected].sort((a, b) => (b.skillLevel || 0) - (a.skillLevel || 0));
+    const teamA: Member[] = [];
+    const teamB: Member[] = [];
+    
+    // Snake draft to balance skill
+    sorted.forEach((m, idx) => {
+      if (idx % 2 === 0) teamA.push(m);
+      else teamB.push(m);
+    });
+    
+    // Shuffle slightly if same skill levels
+    setSplitTeams({ teamA, teamB });
+    playSound(880, 'square', 0.15);
+    addNotification('Tim Berhasil Dibagi!', 'success');
+  };
+
+  const playTaunt = (freq: number) => {
+    playSound(freq, 'sawtooth', 0.3);
+    addNotification('Taunt dikirim!', 'info');
   };
 
   const updateCircleName = () => {
@@ -641,6 +782,28 @@ export default function App() {
 
   return (
     <div className={`min-h-screen font-sans transition-colors duration-300 ${isDark ? 'bg-zinc-950 text-zinc-50 selection:bg-red-900/30' : 'bg-slate-50 text-slate-900 selection:bg-red-100'}`}>
+      {/* Toast Notifications */}
+      <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-3 pointer-events-none">
+        <AnimatePresence>
+          {notifications.map(n => (
+            <motion.div
+              key={n.id}
+              initial={{ opacity: 0, y: -20, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8, y: -20 }}
+              className={`px-6 py-4 rounded-2xl flex items-center gap-4 shadow-2xl backdrop-blur-xl border pointer-events-auto ${
+                n.type === 'success' ? 'bg-green-600/10 border-green-600/30 text-green-500' :
+                n.type === 'error' ? 'bg-red-600/10 border-red-600/30 text-red-500' :
+                'bg-blue-600/10 border-blue-600/30 text-blue-500'
+              }`}
+            >
+              {n.type === 'success' ? <CheckCircle2 size={18} /> : n.type === 'error' ? <X size={18} /> : <Bell size={18} />}
+              <span className="text-[11px] font-black uppercase tracking-widest">{n.text}</span>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
       {/* Mobile Top Header */}
       <div className={`md:hidden sticky top-0 z-40 backdrop-blur-lg border-b px-4 py-3 flex items-center justify-between transition-colors ${isDark ? 'bg-zinc-900/80 border-zinc-800' : 'bg-white/80 border-slate-200'}`}>
         <div className="flex items-center gap-2">
@@ -705,10 +868,64 @@ export default function App() {
               </button>
             ))}
           </nav>
+
+          <div className="mt-10 px-2 space-y-2">
+            <button 
+              onClick={() => { setIsShowingSplitter(true); playSound(660); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                isShowingSplitter 
+                ? (isDark ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-indigo-50 text-indigo-600') 
+                : (isDark ? 'text-zinc-500 hover:bg-zinc-900' : 'text-slate-400 hover:bg-slate-50')
+              }`}
+            >
+              <Dices size={18} />
+              <span className="font-bold text-sm uppercase tracking-wider">Team Splitter</span>
+            </button>
+            
+            <div className="pt-6">
+              <span className={`text-[9px] font-black uppercase tracking-widest ${isDark ? 'text-zinc-600' : 'text-slate-400'}`}>Music Player</span>
+              <div className={`mt-3 p-3 rounded-2xl border flex items-center justify-between ${isDark ? 'bg-zinc-950 border-zinc-900' : 'bg-slate-50 border-slate-100'}`}>
+                 <button 
+                  onClick={() => { setIsPlayingBGM(!isPlayingBGM); playSound(550); }}
+                  className={`p-2 rounded-lg transition-all ${isPlayingBGM ? 'text-red-500' : 'text-zinc-600'}`}
+                 >
+                   {isPlayingBGM ? <Pause size={16} /> : <Play size={16} />}
+                 </button>
+                 <div className="flex-1 px-3">
+                   <div className={`h-1 rounded-full w-full overflow-hidden ${isDark ? 'bg-zinc-800' : 'bg-slate-200'}`}>
+                      <motion.div 
+                        animate={{ x: isPlayingBGM ? [0, 50, 0] : 0 }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                        className="h-full w-20 bg-red-600" 
+                      />
+                   </div>
+                 </div>
+                 <Music size={14} className={isPlayingBGM ? 'animate-bounce text-red-500' : 'text-zinc-600'} />
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Theme Toggle Desktop */}
-        <div className="pt-6 border-t border-zinc-800/10 mt-auto">
+        <div className="pt-6 border-t border-zinc-800/10 mt-auto space-y-4">
+          <div className="px-2">
+            <span className={`text-[9px] font-black uppercase tracking-widest ${isDark ? 'text-zinc-600' : 'text-slate-400'}`}>Tampilan & Tema</span>
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              {(['classic', 'neon', 'minimal'] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => { setTheme(t); playSound(770); }}
+                  className={`w-full aspect-square rounded-xl border flex items-center justify-center transition-all ${
+                    theme === t 
+                    ? (isDark ? 'bg-red-600/20 border-red-600' : 'bg-red-50 border-red-600') 
+                    : (isDark ? 'bg-zinc-800 border-zinc-950 text-zinc-600' : 'bg-slate-50 border-slate-100 text-slate-300')
+                  }`}
+                >
+                  <Palette size={16} />
+                </button>
+              ))}
+            </div>
+          </div>
           <button 
             onClick={toggleTheme}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
@@ -718,7 +935,7 @@ export default function App() {
             }`}
           >
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
-            <span className="font-bold text-sm uppercase tracking-wider">{isDark ? 'Light Mode' : 'Dark Mode'}</span>
+            <span className="font-bold text-sm uppercase tracking-wider">{isDark ? 'Light' : 'Dark'}</span>
           </button>
         </div>
       </div>
@@ -1253,6 +1470,116 @@ export default function App() {
           </div>
         </div>
 
+        {/* Agenda Section */}
+        <div className="mb-20">
+          <div className="flex justify-between items-center mb-8">
+            <div className="flex items-center gap-4">
+              <Calendar size={20} className="text-orange-600" />
+              <h2 className={`text-xl font-black italic uppercase tracking-tighter ${isDark ? 'text-white' : 'text-slate-900'}`}>Agenda Mabar / Turnamen</h2>
+            </div>
+            <button 
+              onClick={() => { setIsAddingSchedule(true); playSound(990); }}
+              className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${isDark ? 'bg-orange-600/10 text-orange-500 border border-orange-600/20 hover:bg-orange-600/20' : 'bg-orange-50 text-orange-600 border border-orange-100 hover:bg-orange-100'}`}
+            >
+              <Plus size={14} />
+              Tambah Agenda
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {(activeCircle.schedule || []).length > 0 ? (activeCircle.schedule || []).map(item => (
+              <motion.div
+                key={item.id}
+                layout
+                className={`p-10 rounded-[3rem] border relative overflow-hidden group transition-all ${
+                  item.date < Date.now() 
+                  ? (isDark ? 'bg-zinc-900/50 border-zinc-800 opacity-60' : 'bg-slate-50 border-slate-100 opacity-60')
+                  : (isDark ? 'bg-zinc-900 border-zinc-800 hover:border-orange-500/30' : 'bg-white border-slate-100 shadow-sm hover:shadow-orange-100')
+                }`}
+              >
+                <div className="flex justify-between items-start mb-8">
+                   <div className={`p-4 rounded-3xl ${
+                      item.type === 'Tournament' ? 'bg-yellow-500 shadow-lg shadow-yellow-500/20' : 
+                      item.type === 'Sparing' ? 'bg-indigo-600 shadow-lg shadow-indigo-600/20' : 'bg-orange-600 shadow-lg shadow-orange-600/20'
+                   } text-white`}>
+                      {item.type === 'Tournament' ? <Trophy size={18} /> : item.type === 'Sparing' ? <Swords size={18} /> : <Zap size={18} />}
+                   </div>
+                   <button 
+                    onClick={() => removeSchedule(item.id)}
+                    className="p-3 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity bg-red-600/10 text-red-500"
+                   >
+                     <Trash2 size={16} />
+                   </button>
+                </div>
+                
+                <div className="space-y-1">
+                   <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${isDark ? 'text-zinc-600' : 'text-slate-400'}`}>{item.type}</p>
+                   <h4 className="text-2xl font-black uppercase tracking-tighter italic leading-none truncate">{item.title}</h4>
+                </div>
+
+                <div className="mt-8 space-y-3">
+                   <div className="flex items-center gap-3 text-xs font-black text-zinc-500 uppercase">
+                      <div className="p-2 bg-zinc-950 rounded-lg">
+                        <Calendar size={12} className="text-orange-500" />
+                      </div>
+                      {new Date(item.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                   </div>
+                   <div className="flex items-center gap-3 text-xs font-black text-zinc-500 uppercase">
+                      <div className="p-2 bg-zinc-950 rounded-lg">
+                        <ExternalLink size={12} className="text-orange-500" />
+                      </div>
+                      {item.location}
+                   </div>
+                </div>
+
+                {item.date >= Date.now() && (
+                  <div className={`mt-10 pt-6 border-t ${isDark ? 'border-white/5' : 'border-slate-50'} flex items-center justify-between`}>
+                     <div className="flex items-center gap-2">
+                       <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping" />
+                       <span className="text-[10px] font-black uppercase tracking-widest text-orange-500">Live Track</span>
+                     </div>
+                     <span className="text-xs font-mono text-zinc-500">{getTimeRemaining(item.date)}</span>
+                  </div>
+                )}
+              </motion.div>
+            )) : (
+              <div className={`col-span-full py-16 text-center rounded-[3rem] border-2 border-dashed ${isDark ? 'border-zinc-800 bg-zinc-900/20 text-zinc-600' : 'border-slate-100 bg-slate-50 text-slate-300'}`}>
+                <Calendar size={32} className="mx-auto mb-4 opacity-20" />
+                <p className="text-xs font-black uppercase tracking-widest italic">Belum ada agenda mabar yang direncanakan.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Soundboard Section */}
+        <div className="mb-20">
+          <div className="flex items-center gap-4 mb-8">
+            <Volume2 size={20} className="text-red-600" />
+            <h2 className={`text-xl font-black italic uppercase tracking-tighter ${isDark ? 'text-white' : 'text-slate-900'}`}>Elite Interaction (Soundboard)</h2>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+            {[
+              { label: 'GGWP', freq: 880, color: 'bg-green-600' },
+              { label: 'ATTACK', freq: 220, color: 'bg-red-600' },
+              { label: 'RETREAT', freq: 440, color: 'bg-blue-600' },
+              { label: 'ULTI', freq: 110, color: 'bg-purple-600' },
+              { label: 'EZ', freq: 1760, color: 'bg-yellow-600' },
+              { label: 'CHAMP', freq: 660, color: 'bg-indigo-600' }
+            ].map((s, idx) => (
+              <button
+                key={idx}
+                onClick={() => playTaunt(s.freq)}
+                className={`flex flex-col items-center justify-center p-6 rounded-[2rem] border transition-all active:scale-90 group ${isDark ? 'bg-zinc-900 border-zinc-800 hover:border-red-500/50' : 'bg-white border-slate-100 hover:border-red-200'}`}
+              >
+                <div className={`w-10 h-10 rounded-xl mb-3 flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform ${s.color}`}>
+                  <Volume1 size={18} />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest">{s.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Top 3 Leaderboard Highlight */}
         {activeCircle.members.length >= 3 && (
           <div className="mb-12">
@@ -1697,16 +2024,20 @@ export default function App() {
                        <h3 className="font-black italic uppercase tracking-tighter text-xl">Achievements</h3>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {selectedMember.achievements.length > 0 ? selectedMember.achievements.map((ach, idx) => (
-                        <div key={idx} className={`px-4 py-2 rounded-xl border flex items-center gap-2 group/ach cursor-default transition-all hover:-translate-y-1 ${isDark ? 'bg-zinc-900 border-zinc-800 hover:border-yellow-500/50' : 'bg-white border-slate-200 hover:border-yellow-200 shadow-sm'}`}>
-                           <Zap size={10} className="text-yellow-500" />
+                      {['FOUNDER', 'OWNER', 'ELITE', 'MVP', 'MVP WIN', 'KILLER', 'ACTIVE', 'SOLID', 'VETERAN', 'PRO PLAYER'].map((ach) => (
+                        <button 
+                          key={ach}
+                          onClick={() => toggleAchievement(selectedMember.id, ach)}
+                          className={`px-4 py-2 rounded-xl border flex items-center gap-2 group/ach transition-all active:scale-95 ${
+                            selectedMember.achievements.includes(ach)
+                            ? (isDark ? 'bg-red-600/10 border-red-600 text-red-500' : 'bg-red-50 border-red-600 text-red-600')
+                            : (isDark ? 'bg-zinc-900 border-zinc-800 text-zinc-500 opacity-50' : 'bg-white border-slate-200 text-slate-300 opacity-50')
+                          }`}
+                        >
+                           {getBadgeIcon(ach)}
                            <span className="text-[10px] font-bold uppercase tracking-tight">{ach}</span>
-                        </div>
-                      )) : (
-                        <div className="text-center py-8 w-full">
-                          <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest italic opacity-50">Belum ada medali.</p>
-                        </div>
-                      )}
+                        </button>
+                      ))}
                     </div>
                     {selectedMember.phone && (
                        <div className="mt-8 pt-6 border-t border-white/5">
@@ -1721,6 +2052,132 @@ export default function App() {
                        </div>
                     )}
                   </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      
+      {/* Team Splitter Modal */}
+      <AnimatePresence>
+        {isShowingSplitter && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsShowingSplitter(false)}
+              className="absolute inset-0 bg-black/95 backdrop-blur-3xl"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8, y: 100 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 100 }}
+              className={`relative w-full max-w-5xl rounded-[4rem] p-16 overflow-hidden border transition-colors ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-100 shadow-2xl'}`}
+            >
+              <div className="flex justify-between items-start mb-16 px-4">
+                <div>
+                  <h2 className="text-7xl font-black leading-none italic uppercase tracking-tighter">Team</h2>
+                  <h2 className="text-7xl font-black text-red-600 mt-2 leading-none italic uppercase tracking-tighter">Splitter</h2>
+                </div>
+                <button 
+                  onClick={() => setIsShowingSplitter(false)} 
+                  className={`p-6 rounded-[2rem] transition-colors ${isDark ? 'bg-zinc-950 hover:bg-zinc-800 text-zinc-600 hover:text-red-500' : 'bg-slate-50 hover:bg-slate-100 text-slate-300 hover:text-red-600'}`}
+                >
+                  <X size={36} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
+                <div className="space-y-10">
+                  <div>
+                    <h3 className={`text-[11px] font-black uppercase tracking-[0.4em] mb-6 ml-4 ${isDark ? 'text-zinc-500' : 'text-slate-400'}`}>Pilih Member Mabar</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[350px] overflow-y-auto pr-4 custom-scrollbar p-2">
+                      {activeCircle.members.map(m => (
+                        <button
+                          key={m.id}
+                          onClick={() => {
+                            const has = splitterMembers.includes(m.id);
+                            setSplitterMembers(has ? splitterMembers.filter(id => id !== m.id) : [...splitterMembers, m.id]);
+                            playSound(has ? 440 : 880);
+                          }}
+                          className={`p-4 rounded-[1.5rem] border text-left transition-all relative overflow-hidden group ${
+                            splitterMembers.includes(m.id)
+                            ? 'bg-red-600 border-red-600 text-white shadow-lg shadow-red-900/30'
+                            : (isDark ? 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700' : 'bg-slate-50 border-slate-100 text-slate-400 hover:border-slate-200 shadow-sm')
+                          }`}
+                        >
+                          <p className="text-[11px] font-black uppercase truncate leading-tight mb-1">{m.name}</p>
+                          <div className="flex items-center justify-between opacity-50">
+                            <p className="text-[8px] font-mono uppercase tracking-tighter">LVL {m.skillLevel}</p>
+                            {splitterMembers.includes(m.id) && <CheckCircle2 size={10} />}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 rounded-3xl bg-black/5 flex items-center justify-between">
+                     <div className="flex items-center gap-4">
+                       <div className="w-12 h-12 bg-red-600 rounded-xl flex items-center justify-center text-white text-xl font-black italic">{splitterMembers.length}</div>
+                       <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Member Terpilih</span>
+                     </div>
+                     <button 
+                        onClick={generateTeams}
+                        disabled={splitterMembers.length < 2}
+                        className="bg-red-600 hover:bg-black text-white px-8 py-5 rounded-2xl font-black italic uppercase transition-all disabled:opacity-20 disabled:grayscale disabled:pointer-events-none shadow-xl shadow-red-900/40 text-sm tracking-tighter"
+                      >
+                        Bagi Tim Seimbang
+                      </button>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  {splitTeams ? (
+                    <div className="space-y-12">
+                      <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className={`p-10 rounded-[3.5rem] border-2 relative overflow-hidden ${isDark ? 'bg-zinc-950 border-blue-900/30 shadow-[0_0_50px_rgba(59,130,246,0.05)]' : 'bg-blue-50/50 border-blue-100'}`}>
+                        <div className="absolute top-0 right-0 p-8 opacity-5">
+                          <Trophy size={80} className="text-blue-500" />
+                        </div>
+                        <h4 className="text-blue-500 font-black italic uppercase text-[11px] tracking-[0.5em] mb-8">BLUE WING</h4>
+                        <div className="grid grid-cols-2 gap-3">
+                           {splitTeams.teamA.map(m => (
+                             <div key={m.id} className={`px-5 py-3 rounded-2xl text-[10px] font-black uppercase border transition-all hover:scale-105 ${isDark ? 'bg-blue-600/10 border-blue-600/30 text-blue-400' : 'bg-white border-blue-100 text-blue-600 shadow-sm'}`}>{m.name}</div>
+                           ))}
+                        </div>
+                      </motion.div>
+
+                      <div className="flex items-center justify-center -my-6 relative z-10">
+                         <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent via-zinc-800 to-transparent" />
+                         <div className="w-12 h-12 rounded-full bg-zinc-900 border-2 border-zinc-800 flex items-center justify-center font-black italic tracking-tighter text-red-600 shadow-2xl">VS</div>
+                         <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent via-zinc-800 to-transparent" />
+                      </div>
+
+                      <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.1 }} className={`p-10 rounded-[3.5rem] border-2 relative overflow-hidden ${isDark ? 'bg-zinc-950 border-red-900/30 shadow-[0_0_50px_rgba(239,68,68,0.05)]' : 'bg-red-50/50 border-red-100'}`}>
+                        <div className="absolute top-0 right-0 p-8 opacity-5">
+                          <Swords size={80} className="text-red-500" />
+                        </div>
+                        <h4 className="text-red-500 font-black italic uppercase text-[11px] tracking-[0.5em] mb-8">RED FLAME</h4>
+                        <div className="grid grid-cols-2 gap-3">
+                           {splitTeams.teamB.map(m => (
+                             <div key={m.id} className={`px-5 py-3 rounded-2xl text-[10px] font-black uppercase border transition-all hover:scale-105 ${isDark ? 'bg-red-600/10 border-red-600/30 text-red-400' : 'bg-white border-red-100 text-red-600 shadow-sm'}`}>{m.name}</div>
+                           ))}
+                        </div>
+                      </motion.div>
+                    </div>
+                  ) : (
+                    <motion.div 
+                      key="empty-splitter"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className={`h-full min-h-[500px] flex flex-col items-center justify-center p-16 text-center rounded-[4rem] border-4 border-dashed relative overflow-hidden ${isDark ? 'border-zinc-800 text-zinc-700 bg-black/20' : 'border-slate-50 text-slate-300 bg-slate-50/50'}`}
+                    >
+                      <Dices size={80} className="mb-8 opacity-10 animate-pulse" />
+                      <h4 className="font-black uppercase tracking-[0.3em] text-sm mb-4">Awaiting Selection</h4>
+                      <p className="font-bold text-[10px] uppercase opacity-50 max-w-[200px] leading-relaxed">Pilih angota Circle-mu di panel kiri untuk mulai membagi tim secara otomatis.</p>
+                    </motion.div>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -1810,7 +2267,94 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Add Poll Modal */}
+      {/* Add Schedule Modal */}
+      <AnimatePresence>
+        {isAddingSchedule && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsAddingSchedule(false)}
+              className="absolute inset-0 bg-black/90 backdrop-blur-3xl"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8, y: 100 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 100 }}
+              className={`relative w-full max-w-lg rounded-[3rem] p-12 overflow-hidden border transition-colors ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-100 shadow-2xl'}`}
+            >
+              <div className="absolute top-0 left-0 w-full h-4 bg-orange-600" />
+              
+              <div className="flex justify-between items-start mb-14">
+                <div className={isDark ? 'text-white' : 'text-slate-900'}>
+                  <h2 className="text-5xl font-black leading-none italic uppercase tracking-tighter">Event</h2>
+                  <h2 className="text-5xl font-black text-orange-600 mt-2 leading-none italic uppercase tracking-tighter">Schedule</h2>
+                </div>
+                <button 
+                  onClick={() => setIsAddingSchedule(false)} 
+                  className={`p-4 rounded-3xl transition-colors ${isDark ? 'hover:bg-zinc-800 text-zinc-600 hover:text-orange-500' : 'hover:bg-slate-50 text-slate-300 hover:text-orange-600'}`}
+                >
+                  <X size={36} />
+                </button>
+              </div>
+              
+              <div className="space-y-8">
+                 <div className="flex gap-4 p-2 bg-zinc-950 rounded-[1.5rem] border border-white/5">
+                   {(['Mabar', 'Tournament', 'Sparing'] as const).map(t => (
+                      <button 
+                         key={t}
+                         onClick={() => { setScheduleType(t); playSound(660); }}
+                         className={`flex-1 py-4 rounded-xl font-black italic uppercase transition-all ${scheduleType === t ? 'bg-orange-600 text-white shadow-xl shadow-orange-600/20' : 'text-zinc-600'}`}
+                      >
+                        {t}
+                      </button>
+                   ))}
+                </div>
+
+                <div className="space-y-4">
+                  <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ml-4 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Nama Kegiatan</label>
+                  <input
+                    type="text"
+                    value={scheduleTitle}
+                    onChange={(e) => setScheduleTitle(e.target.value)}
+                    placeholder="E.G. TOURNAMENT SEASON 1"
+                    className={`w-full border-4 rounded-[1.5rem] py-5 px-6 outline-none transition-all text-xl font-black italic uppercase ${isDark ? 'bg-zinc-950 border-zinc-950 focus:bg-black focus:border-orange-600/30 text-white' : 'bg-slate-50 border-slate-50 focus:bg-white text-slate-900'}`}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ml-4 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Waktu / Tanggal</label>
+                  <input
+                    type="datetime-local"
+                    value={scheduleDate}
+                    onChange={(e) => setScheduleDate(e.target.value)}
+                    className={`w-full border-4 rounded-[1.5rem] py-5 px-6 outline-none transition-all text-xl font-black italic uppercase ${isDark ? 'bg-zinc-950 border-zinc-950 focus:bg-black focus:border-orange-600/30 text-white' : 'bg-slate-50 border-slate-50 focus:bg-white text-slate-900'}`}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ml-4 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Lokasi / Info</label>
+                  <input
+                    type="text"
+                    value={scheduleLocation}
+                    onChange={(e) => setScheduleLocation(e.target.value)}
+                    placeholder="E.G. CUSTOM ROOM / CAFE"
+                    className={`w-full border-4 rounded-[1.5rem] py-5 px-6 outline-none transition-all text-xl font-black italic uppercase ${isDark ? 'bg-zinc-950 border-zinc-950 focus:bg-black focus:border-orange-600/30 text-white' : 'bg-slate-50 border-slate-50 focus:bg-white text-slate-900'}`}
+                  />
+                </div>
+                
+                <button 
+                  onClick={addSchedule}
+                  className="w-full bg-orange-600 hover:bg-orange-700 text-white py-8 rounded-[1.5rem] font-black shadow-2xl transition-all active:scale-95 text-2xl tracking-tighter italic uppercase shadow-orange-950"
+                >
+                  Post Agenda
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       <AnimatePresence>
         {isAddingPoll && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
