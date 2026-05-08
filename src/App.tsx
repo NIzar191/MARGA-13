@@ -36,9 +36,24 @@ import {
   Clock,
   Zap,
   Activity,
-  Settings2
+  Settings2,
+  CheckCircle2,
+  BarChart3,
+  Flame,
+  Award
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { 
+  ResponsiveContainer, 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  Tooltip,
+  BarChart,
+  Bar,
+  Cell
+} from 'recharts';
 import { io } from 'socket.io-client';
 
 // Initialize socket
@@ -57,6 +72,21 @@ interface Member {
   addedAt: number;
 }
 
+interface PollOption {
+  id: string;
+  text: string;
+  votes: string[]; // member IDs
+}
+
+interface Poll {
+  id: string;
+  question: string;
+  options: PollOption[];
+  allowMultiple: boolean;
+  createdAt: number;
+  expiresAt?: number;
+}
+
 interface CircleData {
   id: string;
   name: string;
@@ -68,6 +98,7 @@ interface CircleData {
   activities?: { id: string; text: string; time: number }[];
   moments?: { id: string; url: string; caption?: string; time: number }[];
   matches?: { id: string; opponent: string; score: string; result: 'WIN' | 'LOSE'; date: number }[];
+  polls?: Poll[];
   socialLinks?: { type: string; url: string }[];
   createdAt: number;
 }
@@ -116,6 +147,7 @@ export default function App() {
           activities: circle.activities || [],
           moments: circle.moments || [],
           matches: circle.matches || [],
+          polls: circle.polls || [],
           socialLinks: circle.socialLinks || []
         }));
       } catch (e) {
@@ -157,6 +189,9 @@ export default function App() {
   const [matchOpponent, setMatchOpponent] = useState('');
   const [matchScore, setMatchScore] = useState('');
   const [matchResult, setMatchResult] = useState<'WIN' | 'LOSE'>('WIN');
+  const [isAddingPoll, setIsAddingPoll] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState(['', '']);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [isDark, setIsDark] = useState(() => {
     const saved = localStorage.getItem('theme_preference');
@@ -222,6 +257,16 @@ export default function App() {
     setClaimedMemberId(saved);
   }, [activeCircleId]);
 
+  const getBadgeIcon = (achievement: string) => {
+    const ach = achievement.toUpperCase();
+    if (ach === 'FOUNDER' || ach === 'OWNER') return <ShieldCheck size={10} className="text-red-500" />;
+    if (ach === 'MVP' || ach === 'ELITE') return <Trophy size={10} className="text-yellow-500" />;
+    if (ach === 'MVP WIN' || ach === 'KILLER') return <Crosshair size={10} className="text-orange-500" />;
+    if (ach === 'ACTIVE' || ach === 'SOLID') return <Activity size={10} className="text-green-500" />;
+    if (ach === 'VETERAN') return <History size={10} className="text-blue-500" />;
+    return <Zap size={10} className="text-zinc-500" />;
+  };
+
   const activeCircle = useMemo(() => 
     circles.find(c => c.id === activeCircleId) || circles[0], 
   [circles, activeCircleId]);
@@ -240,7 +285,23 @@ export default function App() {
     const exp = powerLevel % 500;
     const nextExp = 500;
     
-    return { avgSkill, powerLevel, eliteCount, level, exp, nextExp };
+    // Distribution for chart
+    const roleDistribution = members.reduce((acc: any[], m) => {
+      const existing = acc.find(x => x.name === m.role);
+      if (existing) existing.value++;
+      else acc.push({ name: m.role || 'Member', value: 1 });
+      return acc;
+    }, []);
+
+    const skillHistory = [
+      { name: 'Jan', power: Math.floor(powerLevel * 0.7) },
+      { name: 'Feb', power: Math.floor(powerLevel * 0.8) },
+      { name: 'Mar', power: Math.floor(powerLevel * 0.85) },
+      { name: 'Apr', power: Math.floor(powerLevel * 0.95) },
+      { name: 'May', power: powerLevel },
+    ];
+    
+    return { avgSkill, powerLevel, eliteCount, level, exp, nextExp, roleDistribution, skillHistory };
   }, [activeCircle.members]);
 
   const addActivity = (text: string) => {
@@ -307,6 +368,86 @@ export default function App() {
     setMatchOpponent('');
     setMatchScore('');
     setIsAddingMatch(false);
+  };
+  
+  const addPoll = () => {
+    if (!pollQuestion.trim() || pollOptions.some(o => !o.trim())) return;
+    
+    const newPoll: Poll = {
+      id: Math.random().toString(36).substr(2, 9),
+      question: pollQuestion.trim(),
+      options: pollOptions.map(o => ({
+        id: Math.random().toString(36).substr(2, 9),
+        text: o.trim(),
+        votes: []
+      })),
+      allowMultiple: false,
+      createdAt: Date.now()
+    };
+    
+    setCircles(prev => prev.map(c => {
+      if (c.id === activeCircleId) {
+        addActivity(`VOTING BARU: ${newPoll.question}`);
+        return { ...c, polls: [newPoll, ...(c.polls || [])] };
+      }
+      return c;
+    }));
+    
+    playSound(770, 'sine', 0.2);
+    setPollQuestion('');
+    setPollOptions(['', '']);
+    setIsAddingPoll(false);
+  };
+  
+  const votePoll = (pollId: string, optionId: string) => {
+    if (!claimedMemberId) {
+      alert('Pilih identitas Anda terlebih dahulu untuk voting!');
+      setIsChoosingIdentity(true);
+      return;
+    }
+    
+    setCircles(prev => prev.map(c => {
+      if (c.id === activeCircleId) {
+        const polls = (c.polls || []).map(p => {
+          if (p.id === pollId) {
+            return {
+              ...p,
+              options: p.options.map(o => {
+                const hasVoted = o.votes.includes(claimedMemberId);
+                if (o.id === optionId) {
+                  return {
+                    ...o,
+                    votes: hasVoted 
+                      ? o.votes.filter(id => id !== claimedMemberId) 
+                      : [...o.votes, claimedMemberId]
+                  };
+                }
+                // If single choice, remove from other options
+                if (!p.allowMultiple && !hasVoted) {
+                   return { ...o, votes: o.votes.filter(id => id !== claimedMemberId) };
+                }
+                return o;
+              })
+            };
+          }
+          return p;
+        });
+        return { ...c, polls };
+      }
+      return c;
+    }));
+    playSound(660, 'sine', 0.05);
+  };
+
+  const removePoll = (id: string) => {
+    if (!confirm('Hapus voting ini?')) return;
+    setCircles(prev => prev.map(c => {
+      if (c.id === activeCircleId) {
+        return { ...c, polls: (c.polls || []).filter(p => p.id !== id) };
+      }
+      return c;
+    }));
+    playSound(330);
   };
 
   const getTimeRemaining = (targetDate: number) => {
@@ -903,6 +1044,77 @@ export default function App() {
           </div>
         </div>
 
+        {/* Analytics Section */}
+        <div className="mb-20 grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            className={`p-8 rounded-[3rem] border relative overflow-hidden ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-100 shadow-sm'}`}
+          >
+            <div className="flex items-center gap-4 mb-8">
+              <TrendingUp size={20} className="text-red-500" />
+              <h3 className="font-black italic uppercase tracking-tighter text-xl">Power Tier Distribution</h3>
+            </div>
+            <div className="h-[250px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stats.roleDistribution}>
+                   <Tooltip 
+                    cursor={{fill: isDark ? '#27272a' : '#f8fafc'}}
+                    contentStyle={{ 
+                      backgroundColor: isDark ? '#18181b' : '#ffffff',
+                      border: 'none',
+                      borderRadius: '1.5rem',
+                      boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)'
+                    }}
+                  />
+                  <Bar dataKey="value" radius={[12, 12, 12, 12]}>
+                    {stats.roleDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#ef4444' : (isDark ? '#3f3f46' : '#e2e8f0')} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+              <BarChart3 size={120} />
+            </div>
+          </motion.div>
+
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            className={`p-8 rounded-[3rem] border relative overflow-hidden ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-100 shadow-sm'}`}
+          >
+            <div className="flex items-center gap-4 mb-8">
+              <Flame size={20} className="text-red-500" />
+              <h3 className="font-black italic uppercase tracking-tighter text-xl">Circle Progress</h3>
+            </div>
+            <div className="h-[250px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={stats.skillHistory}>
+                  <defs>
+                    <linearGradient id="colorPower" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: isDark ? '#18181b' : '#ffffff',
+                      border: 'none',
+                      borderRadius: '1.5rem',
+                      boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)'
+                    }}
+                  />
+                  <Area animationBegin={300} type="monotone" dataKey="power" stroke="#ef4444" strokeWidth={6} fillOpacity={1} fill="url(#colorPower)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+        </div>
+
         {/* Moment Gallery Section */}
         <div className="mb-20">
           <div className="flex justify-between items-center mb-8">
@@ -953,6 +1165,91 @@ export default function App() {
                 </div>
               )}
             </AnimatePresence>
+          </div>
+        </div>
+
+        {/* Circle Polls Section */}
+        <div className="mb-20">
+          <div className="flex justify-between items-center mb-8">
+            <div className="flex items-center gap-4">
+              <BarChart3 size={20} className="text-red-600" />
+              <h2 className={`text-xl font-black italic uppercase tracking-tighter ${isDark ? 'text-white' : 'text-slate-900'}`}>Voting Circle (Polls)</h2>
+            </div>
+            <button 
+              onClick={() => { setIsAddingPoll(true); playSound(990); }}
+              className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${isDark ? 'bg-indigo-600/10 text-indigo-500 border border-indigo-600/20 hover:bg-indigo-600/20' : 'bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100'}`}
+            >
+              <Plus size={14} />
+              Mulai Voting Baru
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {activeCircle.polls?.length ? (
+              activeCircle.polls.map((poll) => {
+                const totalVotes = poll.options.reduce((acc, o) => acc + o.votes.length, 0);
+                return (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    key={poll.id}
+                    className={`p-10 rounded-[3rem] border relative overflow-hidden group ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-100 shadow-sm'}`}
+                  >
+                    <div className="flex justify-between items-start mb-8">
+                      <h3 className="text-2xl font-black italic uppercase tracking-tighter leading-tight max-w-[80%]">{poll.question}</h3>
+                      <button 
+                        onClick={() => removePoll(poll.id)}
+                        className={`p-3 rounded-xl transition-all opacity-0 group-hover:opacity-100 ${isDark ? 'text-zinc-700 hover:text-red-500 hover:bg-red-500/10' : 'text-slate-300 hover:text-red-600 hover:bg-red-50'}`}
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {poll.options.map((option) => {
+                        const percentage = totalVotes > 0 ? Math.round((option.votes.length / totalVotes) * 100) : 0;
+                        const hasVoted = claimedMemberId && option.votes.includes(claimedMemberId);
+                        
+                        return (
+                          <button
+                            key={option.id}
+                            onClick={() => votePoll(poll.id, option.id)}
+                            className="w-full text-left relative group/opt overflow-hidden rounded-[1.5rem]"
+                          >
+                            <div className={`absolute inset-0 transition-all duration-1000 ${hasVoted ? 'bg-red-600/20' : (isDark ? 'bg-zinc-950' : 'bg-slate-50')}`} style={{ width: `${percentage}%` }} />
+                            <div className={`relative z-10 px-6 py-4 border-2 flex justify-between items-center transition-all ${
+                              hasVoted 
+                              ? 'border-red-600/50' 
+                              : (isDark ? 'border-zinc-800 group-hover/opt:border-zinc-700' : 'border-slate-50 hover:border-slate-200')
+                            }`}>
+                              <div className="flex items-center gap-3">
+                                {hasVoted && <CheckCircle2 size={16} className="text-red-600" />}
+                                <span className={`text-sm font-black uppercase tracking-tight ${hasVoted ? 'text-red-500' : (isDark ? 'text-zinc-100' : 'text-slate-900')}`}>{option.text}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-mono text-zinc-500">{option.votes.length} VOTE</span>
+                                <span className={`text-sm font-black italic ${hasVoted ? 'text-red-500' : ''}`}>{percentage}%</span>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-8 flex justify-between items-center">
+                      <p className={`text-[9px] font-black uppercase tracking-widest ${isDark ? 'text-zinc-600' : 'text-slate-400'}`}>
+                        Total: {totalVotes} Suara • {new Date(poll.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </motion.div>
+                );
+              })
+            ) : (
+              <div className={`col-span-full py-16 text-center rounded-[3rem] border-2 border-dashed ${isDark ? 'border-zinc-800 bg-zinc-900/20 text-zinc-600' : 'border-slate-100 bg-slate-50 text-slate-300'}`}>
+                <BarChart3 size={32} className="mx-auto mb-4 opacity-20" />
+                <p className="text-xs font-black uppercase tracking-widest italic">Belum ada pemungutan suara aktif.</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1092,7 +1389,17 @@ export default function App() {
                         <span className="bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded-sm animate-bounce">TOP TIER</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 mt-2">
+                    {/* Achievements Badges */}
+                    <div className="flex flex-wrap gap-1.5 mt-3">
+                      {member.achievements.map((ach, idx) => (
+                        <div key={idx} className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border ${isDark ? 'bg-zinc-950 border-zinc-800' : 'bg-slate-50 border-slate-100'}`} title={ach}>
+                          {getBadgeIcon(ach)}
+                          <span className={`text-[7px] font-black uppercase tracking-tighter ${isDark ? 'text-zinc-500' : 'text-slate-400'}`}>{ach}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-3 mt-4">
                       <div className={`w-2 h-2 rounded-full ${onlineUsers.includes(member.id) ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]' : (isDark ? 'bg-zinc-800' : 'bg-slate-200')} ${claimedMemberId === member.id ? 'ring-2 ring-offset-2 ring-red-500 ring-offset-zinc-900' : ''}`} />
                       <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${onlineUsers.includes(member.id) ? 'text-green-500' : (isDark ? 'text-zinc-500' : 'text-slate-400')}`}>
                         {onlineUsers.includes(member.id) ? (claimedMemberId === member.id ? 'ANDA AKTIF' : 'AKTIF DI WEB') : 'OFF DI WEB'}
@@ -1496,6 +1803,99 @@ export default function App() {
                   className="w-full bg-red-600 hover:bg-red-700 text-white py-8 rounded-[1.5rem] font-black shadow-2xl transition-all active:scale-95 text-2xl tracking-tighter italic uppercase shadow-red-950"
                 >
                   Simpan Pertandingan
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Poll Modal */}
+      <AnimatePresence>
+        {isAddingPoll && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsAddingPoll(false)}
+              className="absolute inset-0 bg-black/90 backdrop-blur-3xl"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8, y: 100 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 100 }}
+              className={`relative w-full max-w-lg rounded-[3rem] p-12 overflow-hidden border transition-colors ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-100 shadow-2xl'}`}
+            >
+              <div className="absolute top-0 left-0 w-full h-4 bg-indigo-600" />
+              
+              <div className="flex justify-between items-start mb-14">
+                <div className={isDark ? 'text-white' : 'text-slate-900'}>
+                  <h2 className="text-5xl font-black leading-none italic uppercase tracking-tighter">New</h2>
+                  <h2 className="text-5xl font-black text-indigo-600 mt-2 leading-none italic uppercase tracking-tighter">Voting</h2>
+                </div>
+                <button 
+                  onClick={() => setIsAddingPoll(false)} 
+                  className={`p-4 rounded-3xl transition-colors ${isDark ? 'hover:bg-zinc-800 text-zinc-600 hover:text-indigo-500' : 'hover:bg-slate-50 text-slate-300 hover:text-indigo-600'}`}
+                >
+                  <X size={36} />
+                </button>
+              </div>
+              
+              <div className="space-y-8">
+                <div className="space-y-4">
+                  <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ml-4 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Pertanyaan Voting</label>
+                  <input
+                    type="text"
+                    value={pollQuestion}
+                    onChange={(e) => setPollQuestion(e.target.value)}
+                    placeholder="E.G. MAIN DIMANA KITA?"
+                    className={`w-full border-4 rounded-[1.5rem] py-5 px-6 outline-none transition-all text-xl font-black italic uppercase ${isDark ? 'bg-zinc-950 border-zinc-950 focus:bg-black focus:border-indigo-600/30 text-white' : 'bg-slate-50 border-slate-50 focus:bg-white text-slate-900'}`}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center ml-4">
+                    <label className={`block text-[11px] font-black uppercase tracking-[0.4em] ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>Opsi Jawaban</label>
+                    <button 
+                      onClick={() => setPollOptions([...pollOptions, ''])}
+                      className="text-[10px] font-black text-indigo-500 uppercase flex items-center gap-1"
+                    >
+                      <Plus size={12} /> Tambah Opsi
+                    </button>
+                  </div>
+                  <div className="space-y-3 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                    {pollOptions.map((opt, idx) => (
+                      <div key={idx} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={opt}
+                          onChange={(e) => {
+                            const newOpts = [...pollOptions];
+                            newOpts[idx] = e.target.value;
+                            setPollOptions(newOpts);
+                          }}
+                          placeholder={`Opsi ${idx + 1}`}
+                          className={`flex-1 border-4 rounded-xl py-3 px-4 outline-none transition-all text-sm font-black italic uppercase ${isDark ? 'bg-zinc-950 border-zinc-950 focus:bg-black focus:border-indigo-600/30 text-white' : 'bg-slate-50 border-slate-50 focus:bg-white text-slate-900'}`}
+                        />
+                        {pollOptions.length > 2 && (
+                          <button 
+                            onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== idx))}
+                            className="p-3 text-red-500"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <button 
+                  onClick={addPoll}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-8 rounded-[1.5rem] font-black shadow-2xl transition-all active:scale-95 text-2xl tracking-tighter italic uppercase shadow-indigo-950"
+                >
+                  Publikasikan Voting
                 </button>
               </div>
             </motion.div>
